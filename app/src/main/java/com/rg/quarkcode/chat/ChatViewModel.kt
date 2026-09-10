@@ -9,8 +9,10 @@ import androidx.lifecycle.viewModelScope
 import com.rg.quarkcode.backend.EventParser
 import com.rg.quarkcode.backend.ModelRef
 import com.rg.quarkcode.backend.ModelStore
+import com.rg.quarkcode.backend.OpenCodeModel
 import com.rg.quarkcode.backend.OpenCodeProvider
 import com.rg.quarkcode.backend.ProviderCatalog
+import com.rg.quarkcode.backend.ProvidersResponse
 import com.rg.quarkcode.backend.ServeApi
 import com.rg.quarkcode.backend.ServeEventStream
 import com.rg.quarkcode.backend.ServerEvent
