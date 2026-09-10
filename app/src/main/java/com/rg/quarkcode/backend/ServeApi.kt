@@ -25,7 +25,8 @@ class ServeApi(
 
     private val baseUrl = OpenCodeUrl.normalize(host).toHttpUrl()
 
-    private val http = OkHttpClient.Builder()
+    @PublishedApi
+    internal val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -35,7 +36,8 @@ class ServeApi(
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
-    private fun builder(path: String, query: Map<String, String?> = emptyMap()): Request.Builder {
+    @PublishedApi
+    internal fun builder(path: String, query: Map<String, String?> = emptyMap()): Request.Builder {
         val resolved = baseUrl.resolve(path.removePrefix("/"))
             ?: error("Invalid OpenCode API path")
         val url = resolved.newBuilder().apply {
@@ -53,7 +55,8 @@ class ServeApi(
             }
     }
 
-    private fun fail(status: Int, body: String): Nothing {
+    @PublishedApi
+    internal fun fail(status: Int, body: String): Nothing {
         if (status == 401 || status == 403) {
             throw HttpException(status, "OpenCode request failed (HTTP $status)")
         }
@@ -139,11 +142,13 @@ class ServeApi(
         value.replace("/", "%2F").replace("?", "%3F").replace("#", "%23")
 
     companion object {
-        val json: Json = Json {
+        @PublishedApi
+        internal val json: Json = Json {
             ignoreUnknownKeys = true
             isLenient = true
             encodeDefaults = true
         }
-        private val JSON = "application/json; charset=utf-8".toMediaType()
+        @PublishedApi
+        internal val JSON = "application/json; charset=utf-8".toMediaType()
     }
 }
