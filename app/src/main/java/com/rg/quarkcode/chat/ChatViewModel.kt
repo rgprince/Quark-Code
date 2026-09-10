@@ -98,7 +98,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             selProvider = providerId
             selModel = modelId
             val snapshot = runCatching {
-                withContext(Dispatchers.IO) { first(store.selection) }
+                withContext(Dispatchers.IO) { store.selection.first() }
             }.getOrNull()
             val favs = snapshot?.favorites ?: emptySet()
             val recents = snapshot?.recents ?: emptyList()
@@ -151,7 +151,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             selProvider = providerId
             selModel = modelId
             val snapshot = runCatching {
-                withContext(Dispatchers.IO) { first(modelStore!!.selection) }
+                withContext(Dispatchers.IO) { modelStore!!.selection.first() }
             }.getOrNull()
             uiState = uiState.copy(
                 model = labelFor(providerId, modelId),
