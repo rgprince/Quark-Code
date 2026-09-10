@@ -13,12 +13,14 @@ Purpose: AndCode-class coding-agent app, redesigned (not cloned), backed by
 - MCP: Streamable-HTTP `McpClient` (initialize → tools/list → call),
   in-process, ~KBs per server. No node/bun/uvx children.
 
-## V1 scope (this milestone)
-- [ ] Connect screen (localhost default, Keystore password, test button)
-- [ ] Chat screen: message list, tool pulse card, todo card, Allow/Deny card
-- [ ] Top-right token ring button → Context stats sheet (keep bottom meter too)
-- [ ] Orbit composer + Model&Runtime sheet (Native/Server segments, favorites)
-- [ ] Spaces bottom-sheet (Agents/Projects/Recent) instead of AndCode drawer
+## V1 scope — DONE (build green 2026-09-10, `rgprince/Quark`, debug APK 65M)
+- [x] Connect screen (localhost default, Keystore password, test button)
+- [x] Chat screen: message list, tool pulse card, todo card, Allow/Deny card
+- [x] Top-right token ring button → Context stats sheet (bottom meter kept too)
+- [x] Orbit composer + Model&Runtime sheet (Native/Server segments, favorites)
+- [x] Spaces bottom-sheet (Agents/Projects/Recent) instead of AndCode drawer
+
+Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 
 ## Later (V2+)
 - Changes/review tab, fork/revert, slash autocomplete, terminal + file tree
