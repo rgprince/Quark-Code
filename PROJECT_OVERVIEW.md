@@ -1,0 +1,39 @@
+# Quark — native Android agent client
+
+Purpose: AndCode-class coding-agent app, redesigned (not cloned), backed by
+**native opencode** (`Hope2333/opencode-termux` bionic ELF running
+`opencode web` on-device) with **Kai9000-style HTTP-only MCP**
+(no stdio child processes).
+
+## Backend
+- Local native mode: `opencode web --port 4096 --hostname 127.0.0.1` served by
+  the Termux `opencode` package (API >= 28), password via
+  `OPENCODE_SERVER_PASSWORD`, app talks to `http://localhost:4096`.
+- Remote mode: same API over LAN/Tailscale URL (user-provided).
+- MCP: Streamable-HTTP `McpClient` (initialize → tools/list → call),
+  in-process, ~KBs per server. No node/bun/uvx children.
+
+## V1 scope (this milestone)
+- [ ] Connect screen (localhost default, Keystore password, test button)
+- [ ] Chat screen: message list, tool pulse card, todo card, Allow/Deny card
+- [ ] Top-right token ring button → Context stats sheet (keep bottom meter too)
+- [ ] Orbit composer + Model&Runtime sheet (Native/Server segments, favorites)
+- [ ] Spaces bottom-sheet (Agents/Projects/Recent) instead of AndCode drawer
+
+## Later (V2+)
+- Changes/review tab, fork/revert, slash autocomplete, terminal + file tree
+- Schedules + heartbeat (WorkManager), image-gen cards, F-Droid flavor
+
+## Tech stack
+Kotlin 2.3.0, AGP 9.3.2, compileSdk 37, minSdk 28 (native ELF needs API 28+),
+Compose BOM 2025.09.01 + Material3, Navigation3, Retrofit + kotlinx.serialization,
+DataStore, Coil. No KMP, no Electron, no PRoot, no WebView.
+
+## Structure
+- `app/src/main/java/com/quark/agent/` — `MainActivity`, `QuarkApp` (Nav3),
+  `theme/`, `connect/`, `chat/`, `backend/`
+- `Quarkcode/` (sibling, references only): opencode-termux, kai9000, aionui,
+  opencode-android, opencode-ram-report.md
+
+## Target size
+Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
