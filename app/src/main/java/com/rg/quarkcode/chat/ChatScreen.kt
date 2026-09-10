@@ -108,9 +108,10 @@ fun ChatScreen(
     if (state.modelSheet) {
         ModelSheet(
             runtime = state.runtime,
-            models = state.catalog.map { it.label },
-            selected = state.model,
+            models = state.catalog,
+            selectedId = state.selectedModelKey,
             favorites = state.favorites,
+            recents = state.modelRecents,
             onRuntimeChange = onRuntimeChange,
             onModelChange = onModelChange,
             onFavoriteToggle = onFavoriteToggle,

@@ -14,7 +14,13 @@ data class SessionInfo(
     val id: String,
     val title: String = "",
     val cost: Double = 0.0,
-    @SerialName("parentID") val parentId: String? = null
+    @SerialName("parentID") val parentId: String? = null,
+    val time: SessionTime? = null
+)
+
+@Serializable
+data class SessionTime(
+    val archived: Long? = null
 )
 
 @Serializable
@@ -77,6 +83,41 @@ data class ServerTodo(
 data class ProvidersResponse(
     val providers: List<ProviderEntry> = emptyList(),
     val default: Map<String, String> = emptyMap()
+)
+
+// Primary catalog shape: GET /provider (ported from AndCode).
+@Serializable
+data class ProviderCatalog(
+    val all: List<OpenCodeProvider> = emptyList(),
+    val default: Map<String, String> = emptyMap(),
+    val connected: List<String> = emptyList()
+)
+
+@Serializable
+data class OpenCodeProvider(
+    val id: String,
+    val name: String = "",
+    val models: Map<String, OpenCodeModel> = emptyMap()
+) {
+    fun displayName(): String = name.ifEmpty { id }
+}
+
+@Serializable
+data class OpenCodeModel(
+    val id: String = "",
+    @SerialName("providerID") val providerId: String? = null,
+    val name: String = "",
+    val status: String? = null,
+    val limit: OpenCodeModelLimit? = null
+) {
+    fun displayName(): String = name.ifEmpty { id }
+    fun isActive(): Boolean = status == null || status == "active"
+}
+
+@Serializable
+data class OpenCodeModelLimit(
+    val context: Long = 0L,
+    val output: Long = 0L
 )
 
 @Serializable

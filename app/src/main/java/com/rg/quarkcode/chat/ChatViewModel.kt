@@ -1,61 +1,185 @@
 package com.rg.quarkcode.chat
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.rg.quarkcode.backend.EventStream
 import com.rg.quarkcode.backend.MessagePart
+import com.rg.quarkcode.backend.MessageWithParts
+import com.rg.quarkcode.backend.ModelRef
+import com.rg.quarkcode.backend.ModelStore
+import com.rg.quarkcode.backend.OpenCodeProvider
 import com.rg.quarkcode.backend.OpenCodeService
 import com.rg.quarkcode.backend.PermissionResponse
+import com.rg.quarkcode.backend.ProviderCatalog
 import com.rg.quarkcode.backend.SendMessageBody
 import com.rg.quarkcode.backend.ServeClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.util.UUID
 
-class ChatViewModel : ViewModel() {
+class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     var uiState by mutableStateOf(ChatUiState())
         private set
 
+    private val app = application
     private var service: OpenCodeService? = null
+    private var modelStore: ModelStore? = null
     private var sessionId: String? = null
     private var pollJob: Job? = null
+    private var eventJob: Job? = null
+    private var eventStream: EventStream? = null
+    private var selProvider: String? = null
+    private var selModel: String? = null
+    private var providers: List<OpenCodeProvider> = emptyList()
     private val countedTokens = mutableSetOf<String>()
 
     fun attach(host: String, username: String, password: String) {
         service = ServeClient.service(host, username, password)
+        modelStore = ModelStore(app)
         sessionId = null
         countedTokens.clear()
-        uiState = uiState.copy(connected = true, messages = emptyList(), sessionTodos = emptyList())
+        uiState = uiState.copy(
+            connected = true,
+            messages = emptyList(),
+            sessionTodos = emptyList()
+        )
         loadCatalog()
         loadRecents()
+        startEvents(host, username, password)
     }
+
+    // ---- Catalog + selection (ported from AndCode) ----
 
     private fun loadCatalog() {
         viewModelScope.launch {
-            val response = runCatching {
-                withContext(Dispatchers.IO) { service?.providers() }
-            }.getOrNull() ?: return@launch
-            val flat = response.providers.flatMap { provider ->
-                provider.models.map { model ->
-                    CatalogModel(
-                        id = "${provider.id}/${model.id}",
-                        label = "${provider.name.ifEmpty { provider.id }} / ${model.name.ifEmpty { model.id }}",
-                        providerId = provider.id,
-                        modelId = model.id
-                    )
+            val api = service ?: return@launch
+            val catalog = runCatching { withContext(Dispatchers.IO) { api.providers() } }
+                .getOrNull()
+                ?.takeIf { it.all.isNotEmpty() }
+                ?: runCatching { withContext(Dispatchers.IO) { api.configProviders() } }
+                    .getOrNull()
+                    ?.let { fallback ->
+                        ProviderCatalog(
+                            all = fallback.providers.map { entry ->
+                                OpenCodeProvider(
+                                    id = entry.id,
+                                    name = entry.name,
+                                    models = entry.models.associate { model ->
+                                        model.id to com.rg.quarkcode.backend.OpenCodeModel(
+                                            id = model.id,
+                                            name = model.name
+                                        )
+                                    }
+                                )
+                            },
+                            default = fallback.default,
+                            connected = fallback.providers.map { it.id }
+                        )
+                    }
+                ?.takeIf { it.all.isNotEmpty() }
+                ?: return@launch
+            providers = catalog.all
+            val store = modelStore ?: return@launch
+            val (providerId, modelId) = store.reconcile(catalog)
+            selProvider = providerId
+            selModel = modelId
+            val snapshot = runCatching {
+                withContext(Dispatchers.IO) { first(store.selection) }
+            }.getOrNull()
+            val favs = snapshot?.favorites ?: emptySet()
+            val recents = snapshot?.recents ?: emptyList()
+            val label = labelFor(providerId, modelId)
+            val limit = catalog.all.firstOrNull { it.id == providerId }
+                ?.models?.get(modelId)?.limit?.context?.takeIf { it > 0 }
+            uiState = uiState.copy(
+                catalog = catalog.all.flatMap { provider ->
+                    provider.models.values
+                        .filter { it.status != "deprecated" }
+                        .map { model ->
+                            CatalogModel(
+                                id = "${provider.id}/${model.id.ifEmpty { "?" }}",
+                                label = "${provider.displayName()} / ${model.displayName()}",
+                                providerId = provider.id,
+                                modelId = model.id
+                            )
+                        }
+                },
+                model = label,
+                selectedModelKey = if (providerId != null && modelId != null) {
+                    "$providerId/$modelId"
+                } else {
+                    "auto"
+                },
+                favorites = favs,
+                modelRecents = recents,
+                stats = if (limit != null) {
+                    uiState.stats.copy(limit = limit)
+                } else {
+                    uiState.stats
                 }
-            }
-            if (flat.isNotEmpty()) {
-                uiState = uiState.copy(catalog = flat)
-            }
+            )
         }
     }
+
+    private fun labelFor(providerId: String?, modelId: String?): String {
+        if (providerId == null || modelId == null) return "Auto (server default)"
+        val provider = providers.firstOrNull { it.id == providerId }
+        val model = provider?.models?.get(modelId)
+        return "${provider?.displayName() ?: providerId} / ${model?.displayName() ?: modelId}"
+    }
+
+    fun onModelChange(id: String) {
+        val providerId = id.substringBefore('/')
+        val modelId = id.substringAfter('/')
+        if (providerId.isBlank() || modelId.isBlank() || modelId == "?") return
+        viewModelScope.launch {
+            modelStore?.selectModel(providerId, modelId)
+            selProvider = providerId
+            selModel = modelId
+            val snapshot = runCatching {
+                withContext(Dispatchers.IO) { first(modelStore!!.selection) }
+            }.getOrNull()
+            uiState = uiState.copy(
+                model = labelFor(providerId, modelId),
+                selectedModelKey = id,
+                modelSheet = false,
+                modelRecents = snapshot?.recents ?: uiState.modelRecents
+            )
+        }
+    }
+
+    fun toggleFavorite(id: String) {
+        val providerId = id.substringBefore('/')
+        val modelId = id.substringAfter('/')
+        if (providerId.isBlank() || modelId.isBlank()) return
+        viewModelScope.launch {
+            val updated = modelStore?.toggleFavorite(providerId, modelId) ?: return@launch
+            uiState = uiState.copy(favorites = updated)
+        }
+    }
+
+    private fun selectedRef(): ModelRef? =
+        if (!selProvider.isNullOrBlank() && !selModel.isNullOrBlank()) {
+            ModelRef(selProvider!!, selModel!!)
+        } else {
+            null
+        }
+
+    // ---- Sessions ----
 
     private fun loadRecents() {
         viewModelScope.launch {
@@ -63,9 +187,10 @@ class ChatViewModel : ViewModel() {
                 withContext(Dispatchers.IO) { service?.sessions() }
             }.getOrNull() ?: return@launch
             uiState = uiState.copy(
-                recents = sessions.take(20).map {
-                    RecentSession(it.id, it.title.ifEmpty { it.id.take(8) })
-                }
+                recents = sessions
+                    .filter { it.time?.archived == null }
+                    .take(20)
+                    .map { RecentSession(it.id, it.title.ifEmpty { it.id.take(8) }) }
             )
         }
     }
@@ -85,10 +210,9 @@ class ChatViewModel : ViewModel() {
                 withContext(Dispatchers.IO) { service?.messages(id) }
             }
             loaded.onSuccess { list ->
-                uiState = uiState.copy(
-                    sending = false,
-                    messages = (list ?: emptyList()).map { mapServerMessage(it) }
-                )
+                val mapped = (list ?: emptyList()).map { mapServerMessage(it) }
+                mapped.forEach { countedTokens.add(it.id) }
+                uiState = uiState.copy(sending = false, messages = mapped)
                 refreshTodos()
             }.onFailure { err ->
                 uiState = uiState.copy(
@@ -106,120 +230,7 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private fun selectedRef(): com.rg.quarkcode.backend.ModelRef? {
-        val found = uiState.catalog.firstOrNull { it.label == uiState.model }
-        return if (found != null && found.providerId.isNotEmpty() && found.modelId.isNotEmpty()) {
-            com.rg.quarkcode.backend.ModelRef(found.providerId, found.modelId)
-        } else {
-            null
-        }
-    }
-
-    fun onInputChange(value: String) {
-        uiState = uiState.copy(input = value)
-    }
-
-    fun setModelSheet(open: Boolean) {
-        uiState = uiState.copy(modelSheet = open)
-    }
-
-    fun setSpacesSheet(open: Boolean) {
-        uiState = uiState.copy(spacesSheet = open)
-    }
-
-    fun setContextSheet(open: Boolean) {
-        uiState = uiState.copy(contextSheet = open)
-    }
-
-    fun onRuntimeChange(runtime: Runtime) {
-        uiState = uiState.copy(runtime = runtime)
-    }
-
-    fun onModelChange(model: String) {
-        uiState = uiState.copy(model = model, modelSheet = false)
-    }
-
-    fun onAgentChange(agent: String) {
-        uiState = uiState.copy(agent = agent, spacesSheet = false)
-    }
-
-    fun toggleFavorite(model: String) {
-        val current = uiState.favorites
-        uiState = uiState.copy(
-            favorites = if (current.contains(model)) current - model else current + model
-        )
-    }
-
-    fun toggleTools(messageId: String) {
-        val current = uiState.toolsExpanded[messageId] == true
-        uiState = uiState.copy(
-            toolsExpanded = uiState.toolsExpanded + (messageId to !current)
-        )
-    }
-
-    fun toggleTodo(messageId: String, todoId: String) {
-        uiState = uiState.copy(
-            messages = uiState.messages.map { message ->
-                if (message.id != messageId) {
-                    message
-                } else {
-                    message.copy(
-                        todos = message.todos.map { todo ->
-                            if (todo.id != todoId) todo else todo.copy(done = !todo.done)
-                        }
-                    )
-                }
-            }
-        )
-    }
-
-    fun onRememberChange(permissionId: String, remember: Boolean) {
-        uiState = uiState.copy(
-            messages = uiState.messages.map { message ->
-                val permission = message.permission
-                if (permission == null || permission.id != permissionId) {
-                    message
-                } else {
-                    message.copy(permission = permission.copy(remember = remember))
-                }
-            }
-        )
-    }
-
-    fun allow(permissionId: String) {
-        respondPermission(permissionId, "allow")
-    }
-
-    fun deny(permissionId: String) {
-        respondPermission(permissionId, "deny")
-    }
-
-    private fun respondPermission(permissionId: String, response: String) {
-        val id = sessionId ?: return
-        val remember = uiState.messages
-            .mapNotNull { it.permission }
-            .firstOrNull { it.id == permissionId }
-            ?.remember == true
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    service?.respondPermission(id, permissionId, PermissionResponse(response, remember))
-                }
-            }
-            uiState = uiState.copy(
-                messages = uiState.messages.map { message ->
-                    if (message.permission?.id == permissionId) {
-                        message.copy(
-                            permission = null,
-                            text = message.text + "\n\n_" + response.replaceFirstChar { it.uppercase() } + "ed._"
-                        )
-                    } else {
-                        message
-                    }
-                }
-            )
-        }
-    }
+    // ---- Send (async + checked, AndCode-style) ----
 
     fun send() {
         val text = uiState.input.trim()
@@ -252,13 +263,18 @@ class ChatViewModel : ViewModel() {
         )
         pollJob = viewModelScope.launch {
             val failed = runCatching {
-                withContext(Dispatchers.IO) {
+                val (client, id) = withContext(Dispatchers.IO) {
                     val api = service ?: error("Not connected")
-                    val id = sessionId ?: api.createSession().also { sessionId = it.id }.id
-                    val body = SendMessageBody(model = selectedRef(), parts = listOf(MessagePart(text = text)))
-                    api.sendMessageAsync(id, body)
-                    pollUntilIdle(api, id)
+                    val sid = sessionId ?: api.createSession().also { sessionId = it.id }.id
+                    val body = SendMessageBody(
+                        model = selectedRef(),
+                        parts = listOf(MessagePart(text = text))
+                    )
+                    val response = api.sendMessageAsync(sid, body)
+                    if (!response.isSuccessful) error("Server ${response.code()}")
+                    api to sid
                 }
+                pollUntilIdle(client, id)
                 withContext(Dispatchers.Main) {
                     uiState = uiState.copy(sending = false)
                 }
@@ -279,20 +295,29 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    // The blocking POST can hang while the server waits on approvals, so V2
-    // fires prompt_async and polls status + messages instead.
+    // Exit only on real idleness: idle status AND a fresh assistant message,
+    // or several consecutive idle rounds. Unknown status never means idle.
     private suspend fun pollUntilIdle(
         api: OpenCodeService,
         id: String
     ) {
-        var lastCount = -1
+        var lastSize = -1
+        var lastParts = -1
         var idleRounds = 0
+        var grew = false
         repeat(150) {
             delay(2000)
-            val status = runCatching { api.statuses()[id]?.type }.getOrNull()
-            val list = runCatching { api.messages(id) }.getOrNull() ?: emptyList()
-            if (list.size != lastCount) {
-                lastCount = list.size
+            val status = runCatching {
+                withContext(Dispatchers.IO) { api.statuses()[id]?.type }
+            }.getOrNull()
+            val list = runCatching {
+                withContext(Dispatchers.IO) { api.messages(id) }
+            }.getOrNull() ?: emptyList()
+            val parts = list.sumOf { it.parts.size }
+            if (list.size != lastSize || parts != lastParts) {
+                if (lastSize >= 0 && list.size > lastSize) grew = true
+                lastSize = list.size
+                lastParts = parts
                 idleRounds = 0
                 val mapped = list.map { mapServerMessage(it) }
                 val fresh = mapped.filter { countedTokens.add(it.id) }
@@ -309,7 +334,8 @@ class ChatViewModel : ViewModel() {
             } else {
                 idleRounds++
             }
-            if ((status == null || status == "idle") && idleRounds >= 1 && lastCount >= 0) return
+            val lastIsAssistant = list.lastOrNull()?.info?.role == "assistant"
+            if (status == "idle" && ((grew && lastIsAssistant) || idleRounds >= 4)) return
         }
     }
 
@@ -325,11 +351,113 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private fun mapServerMessage(message: com.rg.quarkcode.backend.MessageWithParts): ChatMessage {
+    // ---- Live events (ported from AndCode) ----
+
+    private fun startEvents(host: String, username: String, password: String) {
+        eventJob?.cancel()
+        eventStream?.stop()
+        val stream = EventStream(host, username, password)
+        eventStream = stream
+        eventJob = viewModelScope.launch {
+            stream.collect { event ->
+                withContext(Dispatchers.Main) { handleEvent(event) }
+            }
+        }
+    }
+
+    private fun handleEvent(event: EventStream.ServerEvent) {
+        val payload = event.payload
+        val type = payload["type"]?.jsonPrimitive?.content ?: return
+        val session = payload["sessionID"]?.jsonPrimitive?.content
+            ?: payload["sessionId"]?.jsonPrimitive?.content
+        when {
+            type.startsWith("message.") && (session == null || session == sessionId) -> {
+                refreshMessages()
+            }
+            type == "permission.asked" && (session == null || session == sessionId) -> {
+                val id = payload["id"]?.jsonPrimitive?.content ?: return
+                val tool = payload["permission"]?.jsonPrimitive?.content ?: "tool"
+                val summary = summarizePermission(payload)
+                val request = PermissionRequest(id = id, tool = tool, summary = summary, remember = false)
+                uiState = uiState.copy(
+                    sending = false,
+                    messages = uiState.messages + ChatMessage(
+                        id = UUID.randomUUID().toString(),
+                        isUser = false,
+                        text = "Permission needed: $tool",
+                        permission = request
+                    )
+                )
+            }
+            type == "question.asked" && (session == null || session == sessionId) -> {
+                val questions = payload["questions"]?.jsonArray
+                    ?.mapNotNull { it.jsonObject["question"]?.jsonPrimitive?.content }
+                    ?: emptyList()
+                if (questions.isNotEmpty()) {
+                    uiState = uiState.copy(
+                        messages = uiState.messages + ChatMessage(
+                            id = UUID.randomUUID().toString(),
+                            isUser = false,
+                            text = questions.joinToString("\n\n")
+                        )
+                    )
+                }
+            }
+            (type == "session.idle" || type == "session.error") &&
+                (session == null || session == sessionId) -> {
+                uiState = uiState.copy(sending = false)
+                refreshMessages()
+                refreshTodos()
+            }
+            type == "session.created" -> loadRecents()
+        }
+    }
+
+    private fun summarizePermission(payload: JsonObject): String {
+        val patterns = payload["patterns"]?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.content }
+            ?: emptyList()
+        val metadata = payload["metadata"]?.toString()?.take(300) ?: ""
+        return (patterns + metadata).filter { it.isNotBlank() }.joinToString("\n").ifEmpty {
+            "The agent wants to run this action."
+        }
+    }
+
+    private fun refreshMessages() {
+        val id = sessionId ?: return
+        viewModelScope.launch {
+            val list = runCatching {
+                withContext(Dispatchers.IO) { service?.messages(id) }
+            }.getOrNull() ?: return@launch
+            val mapped = list.map { mapServerMessage(it) }
+            val fresh = mapped.filter { countedTokens.add(it.id) }
+            val added = fresh.sumOf { estimateTokens(it.text) }
+            uiState = uiState.copy(
+                messages = mapped,
+                stats = uiState.stats.copy(
+                    used = uiState.stats.used + added,
+                    output = uiState.stats.output + added
+                )
+            )
+        }
+    }
+
+    // ---- Mapping / helpers ----
+
+    private fun mapServerMessage(message: MessageWithParts): ChatMessage {
         val isUser = message.info.role == "user"
         val texts = message.parts.filter { it.type == "text" }.map { it.text }
+        val thinking = message.parts.filter { it.type == "reasoning" }.map { it.text }
         val tools = message.parts.filter { it.type == "tool" }
-        val body = texts.joinToString("\n\n").ifEmpty { if (isUser) "" else "(no text reply)" }
+        val body = (texts + thinking.map { "[thinking] $it" })
+            .joinToString("\n\n")
+            .ifEmpty {
+                when {
+                    isUser -> ""
+                    tools.isNotEmpty() -> "(working…)"
+                    else -> "(no text reply)"
+                }
+            }
         return ChatMessage(
             id = message.info.id,
             isUser = isUser,
@@ -386,6 +514,12 @@ class ChatViewModel : ViewModel() {
                 done = match.groupValues[1].trim().equals("x", ignoreCase = true)
             )
         }.toList()
+    }
+
+    override fun onCleared() {
+        eventJob?.cancel()
+        eventStream?.stop()
+        super.onCleared()
     }
 
     companion object {

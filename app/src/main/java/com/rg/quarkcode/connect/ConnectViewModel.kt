@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rg.quarkcode.backend.Connection
 import com.rg.quarkcode.backend.ConnectionStore
+import com.rg.quarkcode.backend.OpenCodeUrl
 import com.rg.quarkcode.backend.ServeClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
@@ -55,8 +56,13 @@ class ConnectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun testConnection(onOk: () -> Unit) {
-        val host = normalizeHost(uiState.host)
-        val snapshot = uiState.copy(host = host)
+        val normalized = runCatching { OpenCodeUrl.normalize(uiState.host) }
+        val hostError = normalized.exceptionOrNull()?.message
+        if (hostError != null) {
+            uiState = uiState.copy(checking = false, healthy = false, error = hostError)
+            return
+        }
+        val snapshot = uiState.copy(host = normalized.getOrThrow())
         uiState = snapshot.copy(checking = true, error = null)
         viewModelScope.launch {
             val result = runCatching {
@@ -81,12 +87,6 @@ class ConnectViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
         }
-    }
-
-    private fun normalizeHost(raw: String): String {
-        val trimmed = raw.trim().trimEnd('/')
-        if (trimmed.isEmpty()) return trimmed
-        return if (trimmed.contains("://")) trimmed else "http://$trimmed"
     }
 
     private fun friendlyError(err: Throwable): String {

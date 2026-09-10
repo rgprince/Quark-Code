@@ -54,8 +54,11 @@ interface OpenCodeService {
         @Body body: PermissionResponse
     ): Boolean
 
+    @GET("provider")
+    suspend fun providers(): ProviderCatalog
+
     @GET("config/providers")
-    suspend fun providers(): ProvidersResponse
+    suspend fun configProviders(): ProvidersResponse
 
     @GET("mcp")
     suspend fun mcpStatus(): Map<String, McpStatus>
