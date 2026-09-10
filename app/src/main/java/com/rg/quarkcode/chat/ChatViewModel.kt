@@ -16,6 +16,8 @@ import com.rg.quarkcode.backend.ProvidersResponse
 import com.rg.quarkcode.backend.ServeApi
 import com.rg.quarkcode.backend.ServeEventStream
 import com.rg.quarkcode.backend.ServerEvent
+import com.rg.quarkcode.backend.ServerTodo
+import com.rg.quarkcode.backend.SessionInfo
 import com.rg.quarkcode.backend.sessionIdOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -228,7 +230,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 mapped.forEach { lastSeenIds.add(it.id) }
                 uiState = uiState.copy(sending = false, messages = mapped)
                 refreshTodos()
-                refreshContextUsage()
+                refreshCost(id)
             }.onFailure { err ->
                 uiState = uiState.copy(
                     sending = false,
@@ -349,7 +351,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun ServeApi.messages(id: String): List<com.rg.quarkcode.backend.MessageWithParts> =
-        getList("session/${encode(id)}/message")
+        getList("session/${encodePath(id)}/message")
 
     // Completion is read off the transcript: a fresh assistant message ends it.
     private suspend fun pollUntilDone(
@@ -718,7 +720,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             buildJsonArray {
                                 add(
                                     buildJsonArray {
-                                        add(label)
+                                        add(JsonPrimitive(label))
                                     }
                                 )
                             }
