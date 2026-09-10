@@ -104,6 +104,12 @@ fun ConnectScreen(
                 }
                 Text(if (state.version.isNotEmpty()) "Connected v${state.version}" else "Start chatting")
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Same phone: start the server first — in Termux run: opencode serve --port 4096 (or opencode web --port 4096).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

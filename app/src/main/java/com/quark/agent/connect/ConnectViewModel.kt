@@ -55,7 +55,8 @@ class ConnectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun testConnection(onOk: () -> Unit) {
-        val snapshot = uiState
+        val host = normalizeHost(uiState.host)
+        val snapshot = uiState.copy(host = host)
         uiState = snapshot.copy(checking = true, error = null)
         viewModelScope.launch {
             val result = runCatching {
@@ -76,9 +77,28 @@ class ConnectViewModel(application: Application) : AndroidViewModel(application)
                 uiState = snapshot.copy(
                     checking = false,
                     healthy = false,
-                    error = err.message ?: "Unreachable"
+                    error = friendlyError(err)
                 )
             }
+        }
+    }
+
+    private fun normalizeHost(raw: String): String {
+        val trimmed = raw.trim().trimEnd('/')
+        if (trimmed.isEmpty()) return trimmed
+        return if (trimmed.contains("://")) trimmed else "http://$trimmed"
+    }
+
+    private fun friendlyError(err: Throwable): String {
+        val message = err.message ?: ""
+        return when {
+            "Cleartext" in message ->
+                "HTTP blocked: update Quark (cleartext fix) and retry."
+            "Failed to connect" in message || "refused" in message.lowercase() ->
+                "No server at this address. In Termux run: opencode serve --port 4096"
+            "401" in message || "Unauthorized" in message ->
+                "Wrong username or password (server: OPENCODE_SERVER_USERNAME/PASSWORD)."
+            else -> message.ifEmpty { "Unreachable" }
         }
     }
 }
