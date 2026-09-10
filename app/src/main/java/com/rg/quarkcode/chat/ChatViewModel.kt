@@ -1,15 +1,15 @@
-package com.quark.agent.chat
+package com.rg.quarkcode.chat
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.quark.agent.backend.MessagePart
-import com.quark.agent.backend.OpenCodeService
-import com.quark.agent.backend.PermissionResponse
-import com.quark.agent.backend.SendMessageBody
-import com.quark.agent.backend.ServeClient
+import com.rg.quarkcode.backend.MessagePart
+import com.rg.quarkcode.backend.OpenCodeService
+import com.rg.quarkcode.backend.PermissionResponse
+import com.rg.quarkcode.backend.SendMessageBody
+import com.rg.quarkcode.backend.ServeClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -106,10 +106,10 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private fun selectedRef(): com.quark.agent.backend.ModelRef? {
+    private fun selectedRef(): com.rg.quarkcode.backend.ModelRef? {
         val found = uiState.catalog.firstOrNull { it.label == uiState.model }
         return if (found != null && found.providerId.isNotEmpty() && found.modelId.isNotEmpty()) {
-            com.quark.agent.backend.ModelRef(found.providerId, found.modelId)
+            com.rg.quarkcode.backend.ModelRef(found.providerId, found.modelId)
         } else {
             null
         }
@@ -325,7 +325,7 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private fun mapServerMessage(message: com.quark.agent.backend.MessageWithParts): ChatMessage {
+    private fun mapServerMessage(message: com.rg.quarkcode.backend.MessageWithParts): ChatMessage {
         val isUser = message.info.role == "user"
         val texts = message.parts.filter { it.type == "text" }.map { it.text }
         val tools = message.parts.filter { it.type == "tool" }

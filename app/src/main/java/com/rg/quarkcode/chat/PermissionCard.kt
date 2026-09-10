@@ -1,4 +1,4 @@
-package com.quark.agent.chat
+package com.rg.quarkcode.chat
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

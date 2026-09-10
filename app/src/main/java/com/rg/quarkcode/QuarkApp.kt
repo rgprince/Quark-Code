@@ -1,4 +1,4 @@
-package com.quark.agent
+package com.rg.quarkcode
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -8,11 +8,11 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
-import com.quark.agent.chat.ChatRoute
-import com.quark.agent.chat.ChatScreen
-import com.quark.agent.chat.ChatViewModel
-import com.quark.agent.connect.ConnectScreen
-import com.quark.agent.connect.ConnectViewModel
+import com.rg.quarkcode.chat.ChatRoute
+import com.rg.quarkcode.chat.ChatScreen
+import com.rg.quarkcode.chat.ChatViewModel
+import com.rg.quarkcode.connect.ConnectScreen
+import com.rg.quarkcode.connect.ConnectViewModel
 
 private data object ConnectRoute
 

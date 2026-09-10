@@ -1,4 +1,4 @@
-package com.quark.agent.chat
+package com.rg.quarkcode.chat
 
 data class ChatRoute(val id: String)
 

@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.quark.agent"
+    namespace = "com.rg.quarkcode"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.quark.agent"
+        applicationId = "com.rg.quarkcode"
         minSdk = 28
         targetSdk = 37
         versionCode = 1

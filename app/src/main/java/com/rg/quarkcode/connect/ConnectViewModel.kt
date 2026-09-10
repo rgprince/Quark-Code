@@ -1,4 +1,4 @@
-package com.quark.agent.connect
+package com.rg.quarkcode.connect
 
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -6,9 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.quark.agent.backend.Connection
-import com.quark.agent.backend.ConnectionStore
-import com.quark.agent.backend.ServeClient
+import com.rg.quarkcode.backend.Connection
+import com.rg.quarkcode.backend.ConnectionStore
+import com.rg.quarkcode.backend.ServeClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch

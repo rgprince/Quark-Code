@@ -1,4 +1,4 @@
-package com.quark.agent.theme
+package com.rg.quarkcode.theme
 
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme

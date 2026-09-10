@@ -1,4 +1,4 @@
-package com.quark.agent.backend
+package com.rg.quarkcode.backend
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
