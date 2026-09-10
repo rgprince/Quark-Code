@@ -113,25 +113,6 @@ data class MessageWithParts(
 }
 
 // Server event envelope shapes (parsed by ServeEvents).
-@Serializable
-data class ProvidersResponse(
-    val providers: List<ProviderEntry> = emptyList(),
-    val default: Map<String, String> = emptyMap()
-)
-
-@Serializable
-data class ProviderEntry(
-    val id: String = "",
-    val name: String = "",
-    val models: List<ModelEntry> = emptyList()
-)
-
-@Serializable
-data class ModelEntry(
-    val id: String = "",
-    val name: String = ""
-)
-
 // Fallback catalog shape: GET config/providers (subset of AndCode's).
 @Serializable
 data class ProvidersResponse(
