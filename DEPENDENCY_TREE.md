@@ -21,5 +21,7 @@
 - SavedStateCompose 1.3.1 → savedstate-compose
 - Retrofit 2.11.0 → retrofit-core, converter-kotlinx-serialization
 - OkHttp 4.12.0 → logging-interceptor
-- DataStore 1.2.0 → datastore
+- DataStore 1.2.0 → datastore, datastore-preferences (preferences API
+  lives in the `-preferences` sibling; the bare `datastore` aggregator
+  does not expose it — same group, same approved version)
 - Coil 2.7.0 → coil-compose (image cards)

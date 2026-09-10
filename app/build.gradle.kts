@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.retrofit.kotlin.serialization)
     implementation(libs.okhttp.logging)
     implementation(libs.androidx.dataStore)
+    implementation(libs.androidx.dataStore.preferences)
     implementation(libs.coil.kt.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
