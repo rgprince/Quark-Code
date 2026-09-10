@@ -65,6 +65,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     // ---- Catalog + selection (ported from AndCode) ----
 
     private fun loadCatalog() {
+        uiState = uiState.copy(catalogLoading = true, catalogError = null)
         viewModelScope.launch {
             val api = service ?: return@launch
             val catalog = runCatching { withContext(Dispatchers.IO) { api.providers() } }
@@ -91,7 +92,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 ?.takeIf { it.all.isNotEmpty() }
-                ?: return@launch
+            if (catalog == null) {
+                uiState = uiState.copy(
+                    catalogLoading = false,
+                    catalogError = "No providers found. Is the server connected to a provider?"
+                )
+                return@launch
+            }
             providers = catalog.all
             val store = modelStore ?: return@launch
             val (providerId, modelId) = store.reconcile(catalog)
@@ -106,6 +113,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val limit = catalog.all.firstOrNull { it.id == providerId }
                 ?.models?.get(modelId)?.limit?.context?.takeIf { it > 0 }
             uiState = uiState.copy(
+                catalogLoading = false,
+                catalogError = null,
                 catalog = catalog.all.flatMap { provider ->
                     provider.models.values
                         .filter { it.status != "deprecated" }
@@ -133,6 +142,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         }
+    }
+
+    fun retryCatalog() {
+        loadCatalog()
     }
 
     private fun labelFor(providerId: String?, modelId: String?): String {

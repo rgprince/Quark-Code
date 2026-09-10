@@ -62,7 +62,8 @@ fun QuarkApp(modifier: Modifier = Modifier) {
                         onAgentSelect = chatVm::onAgentChange,
                         onRetry = chatVm::retry,
                         onAbort = chatVm::abort,
-                        onOpenSession = chatVm::openSession
+                        onOpenSession = chatVm::openSession,
+                        onRetryCatalog = chatVm::retryCatalog
                     )
                 }
                 else -> error("Unknown route: $key")

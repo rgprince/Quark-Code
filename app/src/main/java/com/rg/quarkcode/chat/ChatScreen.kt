@@ -35,7 +35,8 @@ fun ChatScreen(
     onAgentSelect: (String) -> Unit,
     onRetry: (String) -> Unit,
     onAbort: () -> Unit,
-    onOpenSession: (String) -> Unit
+    onOpenSession: (String) -> Unit,
+    onRetryCatalog: () -> Unit
 ) {
     Scaffold(
         modifier = modifier,
@@ -112,9 +113,12 @@ fun ChatScreen(
             selectedId = state.selectedModelKey,
             favorites = state.favorites,
             recents = state.modelRecents,
+            catalogLoading = state.catalogLoading,
+            catalogError = state.catalogError,
             onRuntimeChange = onRuntimeChange,
             onModelChange = onModelChange,
             onFavoriteToggle = onFavoriteToggle,
+            onRetryCatalog = onRetryCatalog,
             onDismiss = { onModelSheet(false) }
         )
     }
@@ -146,7 +150,8 @@ private fun ringFraction(stats: ContextStats): Float {
 
 private fun ringLabel(stats: ContextStats): String {
     if (stats.limit <= 0L) return "—"
-    return "${(stats.used * 100) / stats.limit}"
+    val pct = ((stats.used.coerceAtLeast(0L) * 100) / stats.limit).coerceAtMost(999L)
+    return "$pct%"
 }
 
 private fun meterLabel(stats: ContextStats): String {

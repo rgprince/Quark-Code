@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 // Port of the webview SessionContextTab stats behind the ring button.
@@ -50,18 +51,42 @@ fun ContextSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StatCell(label = "Used", value = formatCount(stats.used))
-                StatCell(label = "Limit", value = formatCount(stats.limit))
-                StatCell(label = "Usage", value = usagePercent(stats))
+                StatCell(
+                    label = "Used",
+                    value = formatCount(stats.used),
+                    modifier = Modifier.weight(1f)
+                )
+                StatCell(
+                    label = "Limit",
+                    value = formatCount(stats.limit),
+                    modifier = Modifier.weight(1f)
+                )
+                StatCell(
+                    label = "Usage",
+                    value = usagePercent(stats),
+                    modifier = Modifier.weight(1f)
+                )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StatCell(label = "Input", value = formatCount(stats.input))
-                StatCell(label = "Output", value = formatCount(stats.output))
-                StatCell(label = "Cost", value = "$" + "%.4f".format(stats.cost))
+                StatCell(
+                    label = "Input",
+                    value = formatCount(stats.input),
+                    modifier = Modifier.weight(1f)
+                )
+                StatCell(
+                    label = "Output",
+                    value = formatCount(stats.output),
+                    modifier = Modifier.weight(1f)
+                )
+                StatCell(
+                    label = "Cost",
+                    value = "$" + "%.4f".format(stats.cost),
+                    modifier = Modifier.weight(1f)
+                )
             }
             Spacer(modifier = Modifier.height(20.dp))
             OutlinedButton(
@@ -85,11 +110,15 @@ private fun StatCell(
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

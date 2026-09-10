@@ -61,6 +61,8 @@ data class ChatUiState(
     val agent: String = "Native opencode",
     val catalog: List<CatalogModel> = listOf(CatalogModel("auto", "Auto (server default)")),
     val modelRecents: List<String> = emptyList(),
+    val catalogLoading: Boolean = false,
+    val catalogError: String? = null,
     val recents: List<RecentSession> = emptyList(),
     val sessionTodos: List<TodoItem> = emptyList(),
     val connected: Boolean = false,
