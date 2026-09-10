@@ -424,6 +424,31 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun newSession() {
+        pollJob?.cancel()
+        sessionId = null
+        streamedParts.clear()
+        uiState = uiState.copy(
+            sending = false,
+            thinking = false,
+            messages = emptyList(),
+            sessionTodos = emptyList(),
+            spacesSheet = false
+        )
+    }
+
+    fun deleteSession(id: String) {
+        viewModelScope.launch {
+            runCatching {
+                api?.delete<Boolean>("session/${api!!.encodePath(id)}")
+            }
+            if (sessionId == id) {
+                newSession()
+            }
+            loadRecents()
+        }
+    }
+
     // ---- Live events ----
 
     private fun startEvents() {

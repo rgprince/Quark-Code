@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.okhttp.core)
     implementation(libs.androidx.dataStore)
     implementation(libs.androidx.dataStore.preferences)
+    implementation(libs.androidx.work.ktx)
     implementation(libs.coil.kt.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

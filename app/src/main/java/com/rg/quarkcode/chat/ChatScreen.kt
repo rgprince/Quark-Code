@@ -1,12 +1,17 @@
 package com.rg.quarkcode.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -37,7 +42,8 @@ fun ChatScreen(
     onAbort: () -> Unit,
     onOpenSession: (String) -> Unit,
     onRetryCatalog: () -> Unit,
-    onAnswer: (String, String) -> Unit
+    onAnswer: (String, String) -> Unit,
+    onMenu: () -> Unit
 ) {
     Scaffold(
         modifier = modifier,
@@ -47,6 +53,7 @@ fun ChatScreen(
                 usedFraction = ringFraction(state.stats),
                 usedLabel = ringLabel(state.stats),
                 statusOk = state.connected,
+                onMenu = onMenu,
                 onSpaces = { onSpacesSheet(true) },
                 onTokenClick = { onContextSheet(true) }
             )
@@ -93,6 +100,27 @@ fun ChatScreen(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
+            if (state.thinking) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.tertiary)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Thinking…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             OrbitComposer(
                 input = state.input,
                 model = state.model,

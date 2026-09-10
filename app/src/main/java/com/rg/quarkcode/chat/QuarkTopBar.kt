@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,14 +33,15 @@ fun QuarkTopBar(
     usedLabel: String,
     statusOk: Boolean,
     modifier: Modifier = Modifier,
+    onMenu: () -> Unit,
     onSpaces: () -> Unit,
     onTokenClick: () -> Unit
 ) {
     CenterAlignedTopAppBar(
         modifier = modifier,
         navigationIcon = {
-            IconButton(onClick = onSpaces) {
-                Icon(Icons.Filled.Bolt, contentDescription = "Spaces")
+            IconButton(onClick = onMenu) {
+                Icon(Icons.Filled.Menu, contentDescription = "Menu")
             }
         },
         title = {

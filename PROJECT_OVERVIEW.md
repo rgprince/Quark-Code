@@ -26,16 +26,18 @@ Backend: AndCode-ported client (URL rules, `GET /provider` catalog with
 
 Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 
-## V3 scope — AndCode backend + stability (DONE, build green)
+## V3 scope — faithful backend + drawer/settings (DONE, verified green per push)
 - [x] Rename to Quark Code, package `com.rg.quarkcode` (clean install)
-- [x] URL rules (http only loopback/LAN/Tailscale), stored model pick + reconcile
-- [x] Checked async send, SSE streaming + permission delivery, smarter poll exit
-- [x] Stable token layouts (weighted, ellipsized), compact model pill
-- [x] Catalog loading/error/retry, Favorites/Recents sections in Model sheet
+- [x] OkHttp-direct Serve client (real server error text), typed SSE events
+- [x] Parts chat: thinking/tool/patch/image/error/question cards, deltas, merge
+- [x] Stored model pick + reconcile, checked async send, transcript completion
+- [x] ModalNavigationDrawer (hamburger): New chat, Agents, Projects, Recents+delete, Schedules, Settings
+- [x] Settings: connection test/save, theme, HTTP MCP add/toggle, about
+- [x] Schedules: DataStore CRUD + WorkManager reminder notifications
+- [x] Composer: model pill full row, meter/cost strip, stable token layouts
 
 ## Later (V4+)
-- Question answering API, Changes/review tab, fork/revert, slash autocomplete
-- Terminal + file browser, schedules/heartbeat, image-gen cards
+- Changes/review tab, fork/revert, slash autocomplete, terminal + file browser
 - R8 release shrink (debug APK 65M), F-Droid flavor
 
 ## Tech stack

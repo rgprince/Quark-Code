@@ -29,11 +29,12 @@ private val PaperScheme = lightColorScheme(
 
 @Composable
 fun QuarkTheme(
-    dark: Boolean = isSystemInDarkTheme(),
+    dark: Boolean? = null,
     content: @Composable () -> Unit
 ) {
+    val systemDark = isSystemInDarkTheme()
     MaterialTheme(
-        colorScheme = if (dark) VoidScheme else PaperScheme,
+        colorScheme = if (dark ?: systemDark) VoidScheme else PaperScheme,
         content = content
     )
 }
