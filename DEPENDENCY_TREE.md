@@ -19,8 +19,7 @@
   - navigation3-runtime, navigation3-ui
   - lifecycle-viewmodel-navigation3 2.10.0
 - SavedStateCompose 1.3.1 → savedstate-compose
-- Retrofit 2.11.0 → retrofit-core, converter-kotlinx-serialization
-- OkHttp 4.12.0 → logging-interceptor
+- OkHttp 4.12.0 → okhttp (direct Serve client, AndCode-style; no Retrofit)
 - DataStore 1.2.0 → datastore, datastore-preferences (preferences API
   lives in the `-preferences` sibling; the bare `datastore` aggregator
   does not expose it — same group, same approved version)

@@ -8,8 +8,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rg.quarkcode.backend.Connection
 import com.rg.quarkcode.backend.ConnectionStore
+import com.rg.quarkcode.backend.Health
 import com.rg.quarkcode.backend.OpenCodeUrl
-import com.rg.quarkcode.backend.ServeClient
+import com.rg.quarkcode.backend.ServeApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -66,9 +67,8 @@ class ConnectViewModel(application: Application) : AndroidViewModel(application)
         uiState = snapshot.copy(checking = true, error = null)
         viewModelScope.launch {
             val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    ServeClient.service(snapshot.host, snapshot.username, snapshot.password).health()
-                }
+                ServeApi(snapshot.host, snapshot.username, snapshot.password)
+                    .get<Health>("global/health")
             }
             result.onSuccess { health ->
                 store.save(Connection(snapshot.host, snapshot.username, snapshot.password))

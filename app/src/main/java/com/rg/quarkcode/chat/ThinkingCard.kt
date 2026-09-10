@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -22,21 +22,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-// AndCode's "Ran N, Read M" card, varied: pulse accent rail + real tool log.
+// Collapsed thinking card, AndCode-style: blank reasoning never expands.
 @Composable
-fun ToolPulseCard(
-    runs: Int,
-    files: Int,
-    log: List<String>,
+fun ThinkingCard(
+    part: ChatPart.Reasoning,
     expanded: Boolean,
     modifier: Modifier = Modifier,
     onToggle: () -> Unit
 ) {
+    if (part.text.isBlank() && !expanded) return
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
         )
     ) {
         Row(
@@ -46,17 +45,16 @@ fun ToolPulseCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Filled.Bolt,
+                imageVector = Icons.Filled.Psychology,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.secondary
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Ran $runs command(s) · Read $files file(s)",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+            Text(
+                text = "Thinking",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
             IconButton(onClick = onToggle) {
                 Icon(
                     imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -65,28 +63,12 @@ fun ToolPulseCard(
             }
         }
         if (expanded) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
-            ) {
-                if (log.isEmpty()) {
-                    Text(
-                        text = "No tool output captured.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    log.forEach { entry ->
-                        Text(
-                            text = entry,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-            }
+            Text(
+                text = part.text.ifBlank { "No reasoning captured." },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+            )
         }
     }
 }

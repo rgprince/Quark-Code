@@ -25,7 +25,7 @@ fun ChatScreen(
     onDeny: (String) -> Unit,
     onRememberChange: (String, Boolean) -> Unit,
     onToggleTodo: (String, String) -> Unit,
-    onToggleTools: (String) -> Unit,
+    onTogglePart: (String) -> Unit,
     onModelSheet: (Boolean) -> Unit,
     onSpacesSheet: (Boolean) -> Unit,
     onContextSheet: (Boolean) -> Unit,
@@ -36,7 +36,8 @@ fun ChatScreen(
     onRetry: (String) -> Unit,
     onAbort: () -> Unit,
     onOpenSession: (String) -> Unit,
-    onRetryCatalog: () -> Unit
+    onRetryCatalog: () -> Unit,
+    onAnswer: (String, String) -> Unit
 ) {
     Scaffold(
         modifier = modifier,
@@ -80,14 +81,15 @@ fun ChatScreen(
                 }
                 MessageList(
                     messages = state.messages,
+                    expandedParts = state.expandedParts,
                     modifier = Modifier.weight(1f),
-                    onToggleTools = onToggleTools,
+                    onTogglePart = onTogglePart,
                     onToggleTodo = onToggleTodo,
                     onAllow = onAllow,
                     onDeny = onDeny,
                     onRememberChange = onRememberChange,
                     onRetry = onRetry,
-                    toolsExpanded = state.toolsExpanded
+                    onAnswer = onAnswer
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))

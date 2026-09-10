@@ -52,7 +52,7 @@ fun QuarkApp(modifier: Modifier = Modifier) {
                         onDeny = chatVm::deny,
                         onRememberChange = chatVm::onRememberChange,
                         onToggleTodo = chatVm::toggleTodo,
-                        onToggleTools = chatVm::toggleTools,
+                        onTogglePart = chatVm::togglePart,
                         onModelSheet = chatVm::setModelSheet,
                         onSpacesSheet = chatVm::setSpacesSheet,
                         onContextSheet = chatVm::setContextSheet,
@@ -63,7 +63,8 @@ fun QuarkApp(modifier: Modifier = Modifier) {
                         onRetry = chatVm::retry,
                         onAbort = chatVm::abort,
                         onOpenSession = chatVm::openSession,
-                        onRetryCatalog = chatVm::retryCatalog
+                        onRetryCatalog = chatVm::retryCatalog,
+                        onAnswer = chatVm::answerQuestion
                     )
                 }
                 else -> error("Unknown route: $key")
