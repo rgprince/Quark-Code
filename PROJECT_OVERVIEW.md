@@ -1,9 +1,13 @@
-# Quark — native Android agent client
+# Quark Code — native Android agent client
 
 Purpose: AndCode-class coding-agent app, redesigned (not cloned), backed by
 **native opencode** (`Hope2333/opencode-termux` bionic ELF running
 `opencode web` on-device) with **Kai9000-style HTTP-only MCP**
 (no stdio child processes).
+
+Backend: AndCode-ported client (URL rules, `GET /provider` catalog with
+`/config/providers` fallback, stored selection + reconcile, checked
+`prompt_async`, `global/event` SSE with `/event` fallback, archived filter).
 
 ## Backend
 - Local native mode: `opencode web --port 4096 --hostname 127.0.0.1` served by
@@ -22,14 +26,17 @@ Purpose: AndCode-class coding-agent app, redesigned (not cloned), backed by
 
 Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 
-## V2 scope — connection fix + live server data (in progress)
-- [x] Cleartext HTTP allowed (localhost/LAN), URL normalize, guided errors
-- [x] Async send (`prompt_async` + status/message polling), Stop/Abort button
-- [x] Live model catalog (`/config/providers`) in Model sheet
-- [x] Recent sessions in Spaces + open with history
-- [x] Session todos (`/session/:id/todo`), error cards with Retry
-- [ ] SSE event stream (needs upstream event-shape check)
-- [ ] Terminal + file browser, schedules/heartbeat, R8 release shrink
+## V3 scope — AndCode backend + stability (DONE, build green)
+- [x] Rename to Quark Code, package `com.rg.quarkcode` (clean install)
+- [x] URL rules (http only loopback/LAN/Tailscale), stored model pick + reconcile
+- [x] Checked async send, SSE streaming + permission delivery, smarter poll exit
+- [x] Stable token layouts (weighted, ellipsized), compact model pill
+- [x] Catalog loading/error/retry, Favorites/Recents sections in Model sheet
+
+## Later (V4+)
+- Question answering API, Changes/review tab, fork/revert, slash autocomplete
+- Terminal + file browser, schedules/heartbeat, image-gen cards
+- R8 release shrink (debug APK 65M), F-Droid flavor
 
 ## Tech stack
 Kotlin 2.3.0, AGP 9.3.2, compileSdk 37, minSdk 28 (native ELF needs API 28+),
