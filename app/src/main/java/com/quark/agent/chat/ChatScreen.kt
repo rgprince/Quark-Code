@@ -32,7 +32,10 @@ fun ChatScreen(
     onRuntimeChange: (Runtime) -> Unit,
     onModelChange: (String) -> Unit,
     onFavoriteToggle: (String) -> Unit,
-    onAgentSelect: (String) -> Unit
+    onAgentSelect: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onAbort: () -> Unit,
+    onOpenSession: (String) -> Unit
 ) {
     Scaffold(
         modifier = modifier,
@@ -41,7 +44,7 @@ fun ChatScreen(
                 project = state.project,
                 usedFraction = ringFraction(state.stats),
                 usedLabel = ringLabel(state.stats),
-                statusOk = true,
+                statusOk = state.connected,
                 onSpaces = { onSpacesSheet(true) },
                 onTokenClick = { onContextSheet(true) }
             )
@@ -67,6 +70,13 @@ fun ChatScreen(
                     )
                 }
             } else {
+                if (state.sessionTodos.isNotEmpty()) {
+                    TodoCard(
+                        todos = state.sessionTodos,
+                        onToggle = null
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 MessageList(
                     messages = state.messages,
                     modifier = Modifier.weight(1f),
@@ -75,6 +85,7 @@ fun ChatScreen(
                     onAllow = onAllow,
                     onDeny = onDeny,
                     onRememberChange = onRememberChange,
+                    onRetry = onRetry,
                     toolsExpanded = state.toolsExpanded
                 )
             }
@@ -87,6 +98,7 @@ fun ChatScreen(
                 sending = state.sending,
                 onInputChange = onInputChange,
                 onSend = onSend,
+                onAbort = onAbort,
                 onModelClick = { onModelSheet(true) }
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -96,7 +108,7 @@ fun ChatScreen(
     if (state.modelSheet) {
         ModelSheet(
             runtime = state.runtime,
-            models = listOf(state.model),
+            models = state.catalog.map { it.label },
             selected = state.model,
             favorites = state.favorites,
             onRuntimeChange = onRuntimeChange,
@@ -110,8 +122,9 @@ fun ChatScreen(
             agent = state.agent,
             agents = listOf("Native opencode", "Remote server"),
             projects = listOf(state.project),
-            recents = emptyList(),
+            recents = state.recents,
             onAgentSelect = onAgentSelect,
+            onRecentSelect = onOpenSession,
             onDismiss = { onSpacesSheet(false) }
         )
     }

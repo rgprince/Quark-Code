@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ fun OrbitComposer(
     modifier: Modifier = Modifier,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
+    onAbort: () -> Unit,
     onModelClick: () -> Unit
 ) {
     Surface(
@@ -85,11 +87,23 @@ fun OrbitComposer(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                FilledIconButton(
-                    onClick = onSend,
-                    enabled = input.isNotBlank() && !sending
-                ) {
-                    Icon(Icons.Filled.Send, contentDescription = "Send")
+                if (sending) {
+                    Text(
+                        text = "Working…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    FilledIconButton(onClick = onAbort) {
+                        Icon(Icons.Filled.Stop, contentDescription = "Stop")
+                    }
+                } else {
+                    FilledIconButton(
+                        onClick = onSend,
+                        enabled = input.isNotBlank()
+                    ) {
+                        Icon(Icons.Filled.Send, contentDescription = "Send")
+                    }
                 }
             }
         }

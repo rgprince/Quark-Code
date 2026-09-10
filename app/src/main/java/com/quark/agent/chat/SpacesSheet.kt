@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,9 +28,10 @@ fun SpacesSheet(
     agent: String,
     agents: List<String>,
     projects: List<String>,
-    recents: List<String>,
+    recents: List<RecentSession>,
     modifier: Modifier = Modifier,
     onAgentSelect: (String) -> Unit,
+    onRecentSelect: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -96,11 +98,16 @@ fun SpacesSheet(
                 )
             } else {
                 recents.forEach { recent ->
-                    Text(
-                        text = recent,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(vertical = 6.dp)
-                    )
+                    TextButton(
+                        onClick = { onRecentSelect(recent.id) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = recent.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))

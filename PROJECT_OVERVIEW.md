@@ -22,9 +22,14 @@ Purpose: AndCode-class coding-agent app, redesigned (not cloned), backed by
 
 Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 
-## Later (V2+)
-- Changes/review tab, fork/revert, slash autocomplete, terminal + file tree
-- Schedules + heartbeat (WorkManager), image-gen cards, F-Droid flavor
+## V2 scope — connection fix + live server data (in progress)
+- [x] Cleartext HTTP allowed (localhost/LAN), URL normalize, guided errors
+- [x] Async send (`prompt_async` + status/message polling), Stop/Abort button
+- [x] Live model catalog (`/config/providers`) in Model sheet
+- [x] Recent sessions in Spaces + open with history
+- [x] Session todos (`/session/:id/todo`), error cards with Retry
+- [ ] SSE event stream (needs upstream event-shape check)
+- [ ] Terminal + file browser, schedules/heartbeat, R8 release shrink
 
 ## Tech stack
 Kotlin 2.3.0, AGP 9.3.2, compileSdk 37, minSdk 28 (native ELF needs API 28+),

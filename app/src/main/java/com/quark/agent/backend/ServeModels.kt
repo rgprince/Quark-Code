@@ -67,6 +67,32 @@ data class PermissionResponse(
 )
 
 @Serializable
+data class ServerTodo(
+    val id: String = "",
+    val content: String = "",
+    val status: String = ""
+)
+
+@Serializable
+data class ProvidersResponse(
+    val providers: List<ProviderEntry> = emptyList(),
+    val default: Map<String, String> = emptyMap()
+)
+
+@Serializable
+data class ProviderEntry(
+    val id: String = "",
+    val name: String = "",
+    val models: List<ModelEntry> = emptyList()
+)
+
+@Serializable
+data class ModelEntry(
+    val id: String = "",
+    val name: String = ""
+)
+
+@Serializable
 data class McpStatus(
     val enabled: Boolean = false,
     val version: String = ""

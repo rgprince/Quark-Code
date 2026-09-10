@@ -24,7 +24,20 @@ data class ChatMessage(
     val todos: List<TodoItem> = emptyList(),
     val permission: PermissionRequest? = null,
     val imageUrl: String? = null,
-    val toolLog: List<String> = emptyList()
+    val toolLog: List<String> = emptyList(),
+    val isError: Boolean = false
+)
+
+data class CatalogModel(
+    val id: String,
+    val label: String,
+    val providerId: String = "",
+    val modelId: String = ""
+)
+
+data class RecentSession(
+    val id: String,
+    val title: String
 )
 
 enum class Runtime {
@@ -45,6 +58,10 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val model: String = "Auto (server default)",
     val agent: String = "Native opencode",
+    val catalog: List<CatalogModel> = listOf(CatalogModel("auto", "Auto (server default)")),
+    val recents: List<RecentSession> = emptyList(),
+    val sessionTodos: List<TodoItem> = emptyList(),
+    val connected: Boolean = false,
     val runtime: Runtime = Runtime.NATIVE,
     val favorites: Set<String> = emptySet(),
     val stats: ContextStats = ContextStats(),

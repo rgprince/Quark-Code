@@ -1,5 +1,6 @@
 package com.quark.agent.backend
 
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -34,12 +35,27 @@ interface OpenCodeService {
         @Body body: SendMessageBody
     ): MessageWithParts
 
+    @POST("session/{id}/prompt_async")
+    suspend fun sendMessageAsync(
+        @Path("id") id: String,
+        @Body body: SendMessageBody
+    ): Response<Unit>
+
+    @GET("session/status")
+    suspend fun statuses(): Map<String, SessionStatus>
+
+    @GET("session/{id}/todo")
+    suspend fun todos(@Path("id") id: String): List<ServerTodo>
+
     @POST("session/{id}/permissions/{permissionId}")
     suspend fun respondPermission(
         @Path("id") id: String,
         @Path("permissionId") permissionId: String,
         @Body body: PermissionResponse
     ): Boolean
+
+    @GET("config/providers")
+    suspend fun providers(): ProvidersResponse
 
     @GET("mcp")
     suspend fun mcpStatus(): Map<String, McpStatus>

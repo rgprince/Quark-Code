@@ -15,6 +15,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +32,7 @@ fun MessageList(
     onAllow: (String) -> Unit,
     onDeny: (String) -> Unit,
     onRememberChange: (String, Boolean) -> Unit,
+    onRetry: (String) -> Unit,
     toolsExpanded: Map<String, Boolean>
 ) {
     LazyColumn(
@@ -63,11 +65,30 @@ fun MessageList(
                 }
             } else {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    SelectionContainer {
-                        Text(
-                            text = message.text,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                    if (message.isError) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = message.text,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                TextButton(onClick = { onRetry(message.id) }) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                    } else {
+                        SelectionContainer {
+                            Text(
+                                text = message.text,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
                     }
                     if (message.toolRuns > 0) {
                         Spacer(modifier = Modifier.height(6.dp))

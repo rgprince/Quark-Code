@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 fun TodoCard(
     todos: List<TodoItem>,
     modifier: Modifier = Modifier,
-    onToggle: (String) -> Unit
+    onToggle: ((String) -> Unit)? = null
 ) {
     if (todos.isEmpty()) return
     val done = todos.count { it.done }
@@ -52,7 +52,8 @@ fun TodoCard(
                 ) {
                     Checkbox(
                         checked = todo.done,
-                        onCheckedChange = { onToggle(todo.id) }
+                        enabled = onToggle != null,
+                        onCheckedChange = { onToggle?.invoke(todo.id) }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(

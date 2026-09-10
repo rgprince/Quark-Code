@@ -11,6 +11,8 @@ import com.quark.agent.backend.PermissionResponse
 import com.quark.agent.backend.SendMessageBody
 import com.quark.agent.backend.ServeClient
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -22,10 +24,95 @@ class ChatViewModel : ViewModel() {
 
     private var service: OpenCodeService? = null
     private var sessionId: String? = null
+    private var pollJob: Job? = null
+    private val countedTokens = mutableSetOf<String>()
 
     fun attach(host: String, username: String, password: String) {
         service = ServeClient.service(host, username, password)
         sessionId = null
+        countedTokens.clear()
+        uiState = uiState.copy(connected = true, messages = emptyList(), sessionTodos = emptyList())
+        loadCatalog()
+        loadRecents()
+    }
+
+    private fun loadCatalog() {
+        viewModelScope.launch {
+            val response = runCatching {
+                withContext(Dispatchers.IO) { service?.providers() }
+            }.getOrNull() ?: return@launch
+            val flat = response.providers.flatMap { provider ->
+                provider.models.map { model ->
+                    CatalogModel(
+                        id = "${provider.id}/${model.id}",
+                        label = "${provider.name.ifEmpty { provider.id }} / ${model.name.ifEmpty { model.id }}",
+                        providerId = provider.id,
+                        modelId = model.id
+                    )
+                }
+            }
+            if (flat.isNotEmpty()) {
+                uiState = uiState.copy(catalog = flat)
+            }
+        }
+    }
+
+    private fun loadRecents() {
+        viewModelScope.launch {
+            val sessions = runCatching {
+                withContext(Dispatchers.IO) { service?.sessions() }
+            }.getOrNull() ?: return@launch
+            uiState = uiState.copy(
+                recents = sessions.take(20).map {
+                    RecentSession(it.id, it.title.ifEmpty { it.id.take(8) })
+                }
+            )
+        }
+    }
+
+    fun openSession(id: String) {
+        pollJob?.cancel()
+        sessionId = id
+        countedTokens.clear()
+        uiState = uiState.copy(
+            sending = true,
+            messages = emptyList(),
+            sessionTodos = emptyList(),
+            spacesSheet = false
+        )
+        viewModelScope.launch {
+            val loaded = runCatching {
+                withContext(Dispatchers.IO) { service?.messages(id) }
+            }
+            loaded.onSuccess { list ->
+                uiState = uiState.copy(
+                    sending = false,
+                    messages = (list ?: emptyList()).map { mapServerMessage(it) }
+                )
+                refreshTodos()
+            }.onFailure { err ->
+                uiState = uiState.copy(
+                    sending = false,
+                    messages = listOf(
+                        ChatMessage(
+                            id = UUID.randomUUID().toString(),
+                            isUser = false,
+                            text = "Could not load session: ${err.message ?: "unknown error"}",
+                            isError = true
+                        )
+                    )
+                )
+            }
+        }
+    }
+
+    private fun selectedRef(): com.quark.agent.backend.ModelRef? {
+        val found = uiState.catalog.firstOrNull { it.label == uiState.model }
+        return if (found != null && found.providerId.isNotEmpty() && found.modelId.isNotEmpty()) {
+            com.quark.agent.backend.ModelRef(found.providerId, found.modelId)
+        } else {
+            null
+        }
     }
 
     fun onInputChange(value: String) {
@@ -137,6 +224,21 @@ class ChatViewModel : ViewModel() {
     fun send() {
         val text = uiState.input.trim()
         if (text.isEmpty() || uiState.sending) return
+        startRun(text)
+    }
+
+    fun retry(messageId: String) {
+        if (uiState.sending) return
+        val failed = uiState.messages.firstOrNull { it.id == messageId } ?: return
+        val text = uiState.messages
+            .takeWhile { it.id != messageId }
+            .lastOrNull { it.isUser }
+            ?.text ?: failed.text
+        startRun(text)
+    }
+
+    private fun startRun(text: String) {
+        pollJob?.cancel()
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
             isUser = true,
@@ -145,50 +247,100 @@ class ChatViewModel : ViewModel() {
         uiState = uiState.copy(
             input = "",
             sending = true,
-            messages = uiState.messages + userMessage,
+            messages = uiState.messages.filterNot { it.isError } + userMessage,
             stats = uiState.stats.copy(used = uiState.stats.used + estimateTokens(text))
         )
-        viewModelScope.launch {
-            val reply = runCatching {
+        pollJob = viewModelScope.launch {
+            val failed = runCatching {
                 withContext(Dispatchers.IO) {
                     val api = service ?: error("Not connected")
                     val id = sessionId ?: api.createSession().also { sessionId = it.id }.id
-                    api.sendMessage(id, SendMessageBody(parts = listOf(MessagePart(text = text))))
+                    val body = SendMessageBody(model = selectedRef(), parts = listOf(MessagePart(text = text)))
+                    api.sendMessageAsync(id, body)
+                    pollUntilIdle(api, id)
                 }
-            }
-            reply.onSuccess { result ->
-                val texts = result.parts.filter { it.type == "text" }.map { it.text }
-                val tools = result.parts.filter { it.type == "tool" }
-                val body = texts.joinToString("\n\n").ifEmpty { "(no text reply)" }
-                val assistant = ChatMessage(
-                    id = UUID.randomUUID().toString(),
-                    isUser = false,
-                    text = body,
-                    toolRuns = tools.size,
-                    filesRead = tools.count { it.tool in FILE_TOOLS },
-                    todos = parseTodos(body),
-                    toolLog = tools.take(20).map { tool ->
-                        "${tool.tool ?: "tool"}: ${(tool.output ?: "").take(400)}"
-                    }
-                )
-                uiState = uiState.copy(
-                    sending = false,
-                    messages = uiState.messages + assistant,
-                    stats = uiState.stats.copy(
-                        used = uiState.stats.used + estimateTokens(body),
-                        output = uiState.stats.output + estimateTokens(body)
-                    )
-                )
+                withContext(Dispatchers.Main) {
+                    uiState = uiState.copy(sending = false)
+                }
                 refreshCost()
-            }.onFailure { err ->
+                refreshTodos()
+                loadRecents()
+            }
+            failed.onFailure { err ->
+                if (err is kotlinx.coroutines.CancellationException) return@launch
                 val assistant = ChatMessage(
                     id = UUID.randomUUID().toString(),
                     isUser = false,
-                    text = "Request failed: ${err.message ?: "unknown error"}"
+                    text = "Request failed: ${err.message ?: "unknown error"}",
+                    isError = true
                 )
                 uiState = uiState.copy(sending = false, messages = uiState.messages + assistant)
             }
         }
+    }
+
+    // The blocking POST can hang while the server waits on approvals, so V2
+    // fires prompt_async and polls status + messages instead.
+    private suspend fun pollUntilIdle(
+        api: OpenCodeService,
+        id: String
+    ) {
+        var lastCount = -1
+        var idleRounds = 0
+        repeat(150) {
+            delay(2000)
+            val status = runCatching { api.statuses()[id]?.type }.getOrNull()
+            val list = runCatching { api.messages(id) }.getOrNull() ?: emptyList()
+            if (list.size != lastCount) {
+                lastCount = list.size
+                idleRounds = 0
+                val mapped = list.map { mapServerMessage(it) }
+                val fresh = mapped.filter { countedTokens.add(it.id) }
+                val added = fresh.sumOf { estimateTokens(it.text) }
+                withContext(Dispatchers.Main) {
+                    uiState = uiState.copy(
+                        messages = mapped,
+                        stats = uiState.stats.copy(
+                            used = uiState.stats.used + added,
+                            output = uiState.stats.output + added
+                        )
+                    )
+                }
+            } else {
+                idleRounds++
+            }
+            if ((status == null || status == "idle") && idleRounds >= 1 && lastCount >= 0) return
+        }
+    }
+
+    fun abort() {
+        val id = sessionId ?: return
+        pollJob?.cancel()
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { service?.abortSession(id) }
+            }
+            uiState = uiState.copy(sending = false)
+            refreshTodos()
+        }
+    }
+
+    private fun mapServerMessage(message: com.quark.agent.backend.MessageWithParts): ChatMessage {
+        val isUser = message.info.role == "user"
+        val texts = message.parts.filter { it.type == "text" }.map { it.text }
+        val tools = message.parts.filter { it.type == "tool" }
+        val body = texts.joinToString("\n\n").ifEmpty { if (isUser) "" else "(no text reply)" }
+        return ChatMessage(
+            id = message.info.id,
+            isUser = isUser,
+            text = body,
+            toolRuns = tools.size,
+            filesRead = tools.count { it.tool in FILE_TOOLS },
+            todos = parseTodos(body),
+            toolLog = tools.take(20).map { tool ->
+                "${tool.tool ?: "tool"}: ${(tool.output ?: "").take(400)}"
+            }
+        )
     }
 
     private fun refreshCost() {
@@ -201,6 +353,25 @@ class ChatViewModel : ViewModel() {
                     uiState = uiState.copy(stats = uiState.stats.copy(cost = info.cost))
                 }
             }
+        }
+    }
+
+    private fun refreshTodos() {
+        val id = sessionId ?: return
+        viewModelScope.launch {
+            val todos = runCatching {
+                withContext(Dispatchers.IO) { service?.todos(id) }
+            }.getOrNull() ?: return@launch
+            uiState = uiState.copy(
+                sessionTodos = todos.mapIndexed { index, todo ->
+                    TodoItem(
+                        id = todo.id.ifEmpty { "srv-$index" },
+                        text = todo.content,
+                        done = todo.status.equals("completed", ignoreCase = true) ||
+                            todo.status.equals("done", ignoreCase = true)
+                    )
+                }
+            )
         }
     }
 
