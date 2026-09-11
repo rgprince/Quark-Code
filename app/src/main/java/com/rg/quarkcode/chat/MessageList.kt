@@ -23,9 +23,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,6 +58,7 @@ fun MessageList(
     expandedParts: Set<String>,
     thinking: Boolean,
     autoExpandReasoning: Boolean,
+    speakingId: String?,
     modifier: Modifier = Modifier,
     detailedTools: Boolean = false,
     onTogglePart: (String) -> Unit = {},
@@ -61,7 +67,8 @@ fun MessageList(
     onDeny: (String) -> Unit = {},
     onRememberChange: (String, Boolean) -> Unit = { _, _ -> },
     onRetry: (String) -> Unit = {},
-    onAnswer: (String, String) -> Unit = { _, _ -> }
+    onAnswer: (String, String) -> Unit = { _, _ -> },
+    onSpeak: (String, String) -> Unit = { _, _ -> }
 ) {
     val timeline = remember(messages) { groupConversationTimeline(messages) }
     var sheetGroupId by remember { mutableStateOf<String?>(null) }
@@ -175,8 +182,23 @@ fun MessageList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .animateItem(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (entry.text.isNotBlank()) {
+                        val speaking = speakingId == entry.id
+                        IconButton(
+                            onClick = { onSpeak(entry.id, entry.text) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (speaking) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                                contentDescription = if (speaking) "Stop readout" else "Read aloud",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = formatTime(entry.timestamp),
                         style = MaterialTheme.typography.labelSmall,

@@ -69,8 +69,11 @@ fun SettingsScreen(
     onDetailedChange: (Boolean) -> Unit,
     sendBehavior: String,
     onSendBehaviorChange: (String) -> Unit,
+    autoSpeak: Boolean,
+    onAutoSpeakChange: (Boolean) -> Unit,
     serverVersion: String?,
     diagnosticsText: String,
+    onOpenServerInfo: () -> Unit,
     onNewMcpNameChange: (String) -> Unit,
     onNewMcpUrlChange: (String) -> Unit,
     onAddMcp: () -> Unit,
@@ -215,6 +218,21 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Read replies aloud", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = "Auto speak newest answer (speaker icon replays)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = autoSpeak, onCheckedChange = onAutoSpeakChange)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable(onClick = { onSendBehaviorChange(if (sendBehavior == "queue") "interrupt" else "queue") }),
@@ -304,6 +322,22 @@ fun SettingsScreen(
             item(key = "about") {
                 val clipboard = LocalClipboardManager.current
                 SettingsSection(title = "Server & diagnostics", icon = Icons.Filled.Dns) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenServerInfo),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Server info", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = "Config, providers, commands, skills",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Server version: ${serverVersion ?: "unknown — Test & save first"}",
                         style = MaterialTheme.typography.bodyMedium

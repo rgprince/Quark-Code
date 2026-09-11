@@ -26,7 +26,7 @@ sealed interface TimelineEntry {
 
     data class Todo(override val id: String, val todos: List<TodoItem>) : TimelineEntry
 
-    data class Footer(override val id: String, val timestamp: Long) : TimelineEntry
+    data class Footer(override val id: String, val timestamp: Long, val text: String = "") : TimelineEntry
 }
 
 fun groupConversationTimeline(messages: List<ChatMessage>): List<TimelineEntry> {
@@ -84,7 +84,7 @@ fun groupConversationTimeline(messages: List<ChatMessage>): List<TimelineEntry> 
         }
         flushActivity()
         if (message.timestamp > 0L && message.parts.isNotEmpty() && !message.isStreaming) {
-            entries.add(TimelineEntry.Footer("footer:${message.id}", message.timestamp))
+            entries.add(TimelineEntry.Footer("footer:${message.id}", message.timestamp, message.text))
         }
     }
     return entries

@@ -18,19 +18,22 @@ class ChatPrefs(private val context: Context) {
         val AUTO_EXPAND = booleanPreferencesKey("auto_expand_reasoning")
         val DETAILED_TOOLS = booleanPreferencesKey("detailed_tools")
         val SEND_BEHAVIOR = stringPreferencesKey("send_behavior")
+        val AUTO_SPEAK = booleanPreferencesKey("auto_speak")
     }
 
     data class Prefs(
         val autoExpand: Boolean = false,
         val detailed: Boolean = false,
-        val sendBehavior: String = "interrupt"
+        val sendBehavior: String = "interrupt",
+        val autoSpeak: Boolean = false
     )
 
     val prefs: Flow<Prefs> = context.chatPrefsDataStore.data.map {
         Prefs(
             autoExpand = it[Keys.AUTO_EXPAND] == true,
             detailed = it[Keys.DETAILED_TOOLS] == true,
-            sendBehavior = it[Keys.SEND_BEHAVIOR] ?: "interrupt"
+            sendBehavior = it[Keys.SEND_BEHAVIOR] ?: "interrupt",
+            autoSpeak = it[Keys.AUTO_SPEAK] == true
         )
     }
 
@@ -44,5 +47,9 @@ class ChatPrefs(private val context: Context) {
 
     suspend fun setSendBehavior(value: String) {
         context.chatPrefsDataStore.edit { it[Keys.SEND_BEHAVIOR] = value }
+    }
+
+    suspend fun setAutoSpeak(value: Boolean) {
+        context.chatPrefsDataStore.edit { it[Keys.AUTO_SPEAK] = value }
     }
 }

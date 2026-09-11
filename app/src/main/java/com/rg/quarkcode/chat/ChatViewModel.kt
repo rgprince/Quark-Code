@@ -1,6 +1,7 @@
 package com.rg.quarkcode.chat
 
 import android.app.Application
+import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -60,6 +61,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val streamedParts = mutableMapOf<String, ChatPart>()
     private val messageQueue = mutableListOf<String>()
     private val offlineQueue = mutableListOf<String>()
+    private var atJob: Job? = null
+    private var tts: TextToSpeech? = null
 
     val hasSession: Boolean get() = sessionId != null
 
@@ -85,7 +88,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 uiState = uiState.copy(
                     autoExpandReasoning = prefs.autoExpand,
                     detailedTools = prefs.detailed,
-                    sendBehavior = prefs.sendBehavior
+                    sendBehavior = prefs.sendBehavior,
+                    autoSpeak = prefs.autoSpeak
                 )
             }
         }
@@ -567,6 +571,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startRun(text: String) {
         pollJob?.cancel()
+        stopSpeak()
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
             isUser = true,
@@ -1038,6 +1043,87 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onInputChange(value: String) {
         uiState = uiState.copy(input = value)
+        refreshAtSuggestions(value)
+    }
+
+    // ---- @ file mentions (aionui IA: GET find/file, insert literal @path) ----
+
+    private fun refreshAtSuggestions(text: String) {
+        atJob?.cancel()
+        val query = AtMentions.detectQuery(text)
+        if (query == null) {
+            if (uiState.atSuggestions.isNotEmpty()) uiState = uiState.copy(atSuggestions = emptyList())
+            return
+        }
+        atJob = viewModelScope.launch {
+            delay(300L)
+            val client = api ?: return@launch
+            val paths = runCatching {
+                client.getList<String>("find/file", mapOf("query" to query, "limit" to "20"))
+            }.getOrNull() ?: return@launch
+            uiState = uiState.copy(atSuggestions = AtMentions.rank(paths, query))
+        }
+    }
+
+    fun insertAtFile(path: String) {
+        val inserted = AtMentions.insert(uiState.input, path)
+        uiState = uiState.copy(input = inserted, atSuggestions = emptyList())
+    }
+
+    fun appendVoiceResult(transcript: String) {
+        val clean = transcript.trim()
+        if (clean.isEmpty()) return
+        val current = uiState.input
+        val joined = if (current.isBlank()) clean else current.trimEnd() + " " + clean
+        uiState = uiState.copy(input = joined)
+        refreshAtSuggestions(joined)
+    }
+
+    // ---- TTS readout (kai9000 IA, framework engine — no new deps) ----
+
+    fun setAutoSpeak(value: Boolean) {
+        uiState = uiState.copy(autoSpeak = value)
+        if (!value) stopSpeak()
+        viewModelScope.launch { chatPrefs?.setAutoSpeak(value) }
+    }
+
+    fun speakNow(id: String, text: String) {
+        val clean = AtMentions.speakable(text)
+        if (clean.isEmpty()) return
+        if (tts == null) {
+            tts = TextToSpeech(app, { status ->
+                if (status == TextToSpeech.SUCCESS) speakNow(id, text)
+            })
+            tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) = Unit
+                override fun onDone(utteranceId: String?) {
+                    viewModelScope.launch {
+                        if (uiState.speakingId == utteranceId) {
+                            uiState = uiState.copy(speakingId = null)
+                        }
+                    }
+                }
+                override fun onError(utteranceId: String?) {
+                    viewModelScope.launch {
+                        if (uiState.speakingId == utteranceId) {
+                            uiState = uiState.copy(speakingId = null)
+                        }
+                    }
+                }
+            })
+            return
+        }
+        tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id)
+        uiState = uiState.copy(speakingId = id)
+    }
+
+    fun toggleSpeak(id: String, text: String) {
+        if (uiState.speakingId == id) stopSpeak() else speakNow(id, text)
+    }
+
+    fun stopSpeak() {
+        tts?.stop()
+        if (uiState.speakingId != null) uiState = uiState.copy(speakingId = null)
     }
 
     fun setModelSheet(open: Boolean) {
@@ -1216,6 +1302,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         pollJob?.cancel()
         eventJob?.cancel()
+        atJob?.cancel()
+        tts?.shutdown()
         super.onCleared()
     }
 }

@@ -25,6 +25,7 @@ import com.rg.quarkcode.chat.ChatScreen
 import com.rg.quarkcode.chat.ChatViewModel
 import com.rg.quarkcode.chat.ReviewScreen
 import com.rg.quarkcode.settings.ProvidersScreen
+import com.rg.quarkcode.settings.ServerInfoScreen
 import com.rg.quarkcode.connect.ConnectScreen
 import com.rg.quarkcode.connect.ConnectViewModel
 import com.rg.quarkcode.drawer.QuarkDrawer
@@ -38,6 +39,7 @@ import kotlinx.coroutines.launch
 private data object ConnectRoute
 private data object SettingsRoute
 private data object ProvidersRoute
+private data object ServerInfoRoute
 private data object SchedulesRoute
 private data object DiffRoute
 
@@ -164,6 +166,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onSlashSelect = { suggestion ->
                                     chatVm.onInputChange(suggestion.name + " ")
                                 },
+                                onAtSelect = { file ->
+                                    chatVm.insertAtFile(file.path)
+                                },
+                                onVoiceResult = chatVm::appendVoiceResult,
+                                onSpeak = chatVm::toggleSpeak,
                                 onDismissTodos = chatVm::dismissTodos,
                                 onOpenSettings = { backStack.add(SettingsRoute) },
                                 onMenu = { openDrawer() }
@@ -206,8 +213,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 },
                                 sendBehavior = chatVm.uiState.sendBehavior,
                                 onSendBehaviorChange = chatVm::setSendBehavior,
+                                autoSpeak = chatVm.uiState.autoSpeak,
+                                onAutoSpeakChange = chatVm::setAutoSpeak,
                                 serverVersion = settingsVm.uiState.serverVersion,
                                 diagnosticsText = settingsVm.diagnosticsText(),
+                                onOpenServerInfo = { backStack.add(ServerInfoRoute) },
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,
@@ -254,6 +264,17 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onSaveKey = settingsVm::saveProviderKey,
                                 onDisconnect = settingsVm::disconnectProvider,
                                 onCloseDialog = settingsVm::closeProviderDialog
+                            )
+                        }
+                        is ServerInfoRoute -> NavEntry(key) {
+                            ServerInfoScreen(
+                                state = settingsVm.uiState,
+                                onBack = { backStack.removeLastOrNull() },
+                                onOpen = settingsVm::loadServerInfoFull,
+                                onStartEdit = settingsVm::startEditConfig,
+                                onCancelEdit = settingsVm::cancelEditConfig,
+                                onDraftChange = settingsVm::onConfigDraftChange,
+                                onSave = settingsVm::saveConfig
                             )
                         }
                         else -> error("Unknown route: $key")

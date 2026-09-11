@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -29,6 +30,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
@@ -38,6 +40,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -74,14 +77,17 @@ fun OrbitComposer(
     variants: List<String>,
     selectedVariant: String?,
     slashSuggestions: List<SlashSuggestion>,
+    atSuggestions: List<AtFile>,
     modifier: Modifier = Modifier,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onAbort: () -> Unit,
+    onMicClick: () -> Unit,
     onModelClick: () -> Unit,
     onModeChange: (String) -> Unit,
     onVariantChange: (String?) -> Unit,
-    onSlashSelect: (SlashSuggestion) -> Unit
+    onSlashSelect: (SlashSuggestion) -> Unit,
+    onAtSelect: (AtFile) -> Unit
 ) {
     // Provider name stays out of the box: short model label only.
     val shortModel = model.substringAfter(" / ", model)
@@ -122,6 +128,48 @@ fun OrbitComposer(
                             )
                             Text(
                                 text = suggestion.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        if (atSuggestions.isNotEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+            ) {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 240.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(atSuggestions, key = { it.path }) { file ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onAtSelect(file) }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = file.name,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = file.path,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -185,6 +233,22 @@ fun OrbitComposer(
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
+                        }
+                    }
+                    if (!sending) {
+                        Surface(
+                            modifier = Modifier.size(38.dp),
+                            shape = RoundedCornerShape(19.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            IconButton(onClick = onMicClick, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    Icons.Filled.Mic,
+                                    contentDescription = "Voice input",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                     FilledIconButton(

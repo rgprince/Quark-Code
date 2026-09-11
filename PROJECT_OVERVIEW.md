@@ -73,6 +73,11 @@ Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 - [x] Send queue: Interrupt/Queue toggle (Settings Chat + `ChatPrefs`), `Queued N` pill, drain on idle; offline queue auto-sends on attach
 - [x] Model visibility: hide eye in Show-all mode, Hidden section to unhide, `ModelStore.hidden`, pick unhides
 
+## V4.4 batch — voice, @ mentions, server info (subagent research)
+- [x] Voice, framework-only (kai9000 has NO vosk/mic/wake code — TTS-output only via unapproved KMP lib): mic button + `RecognizerIntent` transcript insert (`RECORD_AUDIO`), framework `TextToSpeech` readout (per-message speaker in footer, auto-speak toggle, markdown-stripped, stops on send)
+- [x] `@` file mentions (aionui IA): `GET find/file` ranked popup, insert literal `@path` (server resolves natively); and-code/kai9000 confirmed no @ mapping
+- [x] Server info screen: version, `GET`/`PATCH config` editor, providers/commands/skills lists; diagnostics upgraded (app version, memory, storage). No log viewer exists upstream — no endpoint to wire
+
 ## Tech stack
 Kotlin 2.3.0, AGP 9.3.2, compileSdk 37, minSdk 28 (native ELF needs API 28+),
 Compose BOM 2025.09.01 + Material3, Navigation3, Retrofit + kotlinx.serialization,

@@ -1,5 +1,7 @@
 package com.rg.quarkcode.chat
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -11,9 +13,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
+import androidx.core.content.ContextCompat
 
 @Composable
 fun ChatScreen(
@@ -42,10 +55,43 @@ fun ChatScreen(
     onModeChange: (String) -> Unit,
     onVariantChange: (String?) -> Unit,
     onSlashSelect: (SlashSuggestion) -> Unit,
+    onAtSelect: (AtFile) -> Unit,
+    onVoiceResult: (String) -> Unit,
+    onSpeak: (String, String) -> Unit,
     onDismissTodos: () -> Unit,
     onOpenSettings: () -> Unit,
     onMenu: () -> Unit
 ) {
+    val context = LocalContext.current
+    val recognizerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()?.let { onVoiceResult(it) }
+        }
+    }
+    fun launchRecognizer() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        }
+        runCatching { recognizerLauncher.launch(intent) }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) launchRecognizer()
+    }
+    // Auto-readout: speak the newest assistant text once the turn completes
+    // (gated on !sending so streaming deltas don't restart speech).
+    val lastAssistantText = remember(state.messages) {
+        state.messages.lastOrNull { !it.isUser }?.text.orEmpty()
+    }
+    LaunchedEffect(lastAssistantText, state.autoSpeak, state.sending) {
+        if (state.autoSpeak && !state.sending && lastAssistantText.isNotBlank()) {
+            onSpeak("auto", lastAssistantText)
+        }
+    }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -93,6 +139,7 @@ fun ChatScreen(
                     expandedParts = state.expandedParts,
                     thinking = state.thinking,
                     autoExpandReasoning = state.autoExpandReasoning,
+                    speakingId = state.speakingId,
                     modifier = Modifier.weight(1f),
                     onTogglePart = onTogglePart,
                     onToggleTodo = onToggleTodo,
@@ -100,7 +147,8 @@ fun ChatScreen(
                     onDeny = onDeny,
                     onRememberChange = onRememberChange,
                     onRetry = onRetry,
-                    onAnswer = onAnswer
+                    onAnswer = onAnswer,
+                    onSpeak = onSpeak
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -122,13 +170,24 @@ fun ChatScreen(
                 } else {
                     emptyList()
                 },
+                atSuggestions = state.atSuggestions,
                 onInputChange = onInputChange,
                 onSend = onSend,
                 onAbort = onAbort,
+                onMicClick = {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        launchRecognizer()
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
                 onModelClick = { onModelSheet(true) },
                 onModeChange = onModeChange,
                 onVariantChange = onVariantChange,
-                onSlashSelect = onSlashSelect
+                onSlashSelect = onSlashSelect,
+                onAtSelect = onAtSelect
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
