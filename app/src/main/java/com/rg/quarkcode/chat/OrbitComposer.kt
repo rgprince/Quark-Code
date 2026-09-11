@@ -401,8 +401,7 @@ private fun CompactMeter(
             color = color,
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
             strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt,
-            gapSize = 0.dp,
-            drawStopIndicator = false
+            gapSize = 0.dp
         )
         Text(
             text = label,
