@@ -1,19 +1,12 @@
 package com.rg.quarkcode.chat
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -45,6 +38,9 @@ fun ChatScreen(
     onOpenSession: (String) -> Unit,
     onRetryCatalog: () -> Unit,
     onAnswer: (String, String) -> Unit,
+    onModeChange: (String) -> Unit,
+    onVariantChange: (String?) -> Unit,
+    onSlashSelect: (SlashSuggestion) -> Unit,
     onOpenSettings: () -> Unit,
     onMenu: () -> Unit
 ) {
@@ -92,6 +88,8 @@ fun ChatScreen(
                 MessageList(
                     messages = state.messages,
                     expandedParts = state.expandedParts,
+                    thinking = state.thinking,
+                    autoExpandReasoning = state.autoExpandReasoning,
                     modifier = Modifier.weight(1f),
                     onTogglePart = onTogglePart,
                     onToggleTodo = onToggleTodo,
@@ -103,37 +101,29 @@ fun ChatScreen(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            if (state.thinking) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiary)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Thinking…",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
             OrbitComposer(
                 input = state.input,
                 model = state.model,
                 meterLabel = meterLabel(state.stats),
-                costLabel = "$" + "%.4f".format(state.stats.cost),
                 sending = state.sending,
+                modes = state.modes,
+                mode = state.mode,
+                variants = state.variants,
+                selectedVariant = state.selectedVariant,
+                slashSuggestions = if (state.input.startsWith("/")) {
+                    state.slashCommands.filter {
+                        it.name.startsWith(state.input.trim(), ignoreCase = true)
+                    }
+                } else {
+                    emptyList()
+                },
                 onInputChange = onInputChange,
                 onSend = onSend,
                 onAbort = onAbort,
-                onModelClick = { onModelSheet(true) }
+                onModelClick = { onModelSheet(true) },
+                onModeChange = onModeChange,
+                onVariantChange = onVariantChange,
+                onSlashSelect = onSlashSelect
             )
             Spacer(modifier = Modifier.height(8.dp))
         }

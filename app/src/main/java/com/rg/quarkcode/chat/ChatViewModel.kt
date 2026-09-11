@@ -9,8 +9,11 @@ import androidx.lifecycle.viewModelScope
 import com.rg.quarkcode.backend.EventParser
 import com.rg.quarkcode.backend.ModelRef
 import com.rg.quarkcode.backend.ModelStore
+import com.rg.quarkcode.backend.OpenCodeAgent
+import com.rg.quarkcode.backend.OpenCodeCommand
 import com.rg.quarkcode.backend.OpenCodeModel
 import com.rg.quarkcode.backend.OpenCodeProvider
+import com.rg.quarkcode.backend.OpenCodeSkill
 import com.rg.quarkcode.backend.ProviderCatalog
 import com.rg.quarkcode.backend.ProvidersResponse
 import com.rg.quarkcode.backend.ServeApi
@@ -50,12 +53,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var selProvider: String? = null
     private var selModel: String? = null
     private var providers: List<OpenCodeProvider> = emptyList()
+    private var backendCommands: List<OpenCodeCommand> = emptyList()
+    private var backendSkills: List<OpenCodeSkill> = emptyList()
+    private var chatPrefs: ChatPrefs? = null
     private var lastSeenIds = mutableSetOf<String>()
     private val streamedParts = mutableMapOf<String, ChatPart>()
 
     fun attach(host: String, username: String, password: String) {
         api = ServeApi(host, username, password)
         modelStore = ModelStore(app)
+        chatPrefs = ChatPrefs(app)
         streamHost = host
         streamUser = username
         streamPass = password
@@ -67,6 +74,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             messages = emptyList(),
             sessionTodos = emptyList()
         )
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { chatPrefs!!.prefs.first() }
+            }.getOrNull()?.let { prefs ->
+                uiState = uiState.copy(
+                    autoExpandReasoning = prefs.autoExpand,
+                    detailedTools = prefs.detailed
+                )
+            }
+        }
         loadCatalog()
         loadRecents()
         startEvents()
@@ -133,16 +150,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 },
                 providers = catalog.all.map { ProviderOption(it.id, it.displayName()) },
                 selectedProviderId = providerId,
-                model = labelFor(providerId, modelId),
                 selectedModelKey = if (providerId != null && modelId != null) {
                     "$providerId/$modelId"
                 } else {
                     "auto"
                 },
+                model = labelFor(providerId, modelId),
+                variants = catalog.all.firstOrNull { it.id == providerId }
+                    ?.models?.get(modelId)?.variants?.keys?.toList() ?: emptyList(),
+                selectedVariant = null,
                 favorites = snapshot?.favorites ?: emptySet(),
                 modelRecents = snapshot?.recents ?: emptyList(),
                 stats = if (limit != null) uiState.stats.copy(limit = limit) else uiState.stats
             )
+            refreshSlashCatalog()
+            loadAgents()
         }
     }
 
@@ -175,6 +197,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 selectedModelKey = id,
                 selectedProviderId = providerId,
                 modelSheet = false,
+                // A reasoning variant belongs to the old model — clear on switch (AndCode parity).
+                selectedVariant = null,
+                variants = providers.firstOrNull { it.id == providerId }
+                    ?.models?.get(modelId)?.variants?.keys?.toList() ?: emptyList(),
                 modelRecents = snapshot?.recents ?: uiState.modelRecents,
                 stats = if (limit != null) uiState.stats.copy(limit = limit) else uiState.stats
             )
@@ -194,6 +220,181 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun onProviderChange(providerId: String) {
         val first = uiState.catalog.firstOrNull { it.providerId == providerId }?.id ?: return
         onModelChange(first)
+    }
+
+    fun onModeChange(mode: String) {
+        uiState = uiState.copy(mode = mode.ifBlank { null })
+    }
+
+    fun onVariantChange(variant: String?) {
+        uiState = uiState.copy(selectedVariant = variant)
+    }
+
+    fun setAutoExpand(value: Boolean) {
+        uiState = uiState.copy(autoExpandReasoning = value)
+        viewModelScope.launch { chatPrefs?.setAutoExpand(value) }
+    }
+
+    fun setDetailedTools(value: Boolean) {
+        uiState = uiState.copy(detailedTools = value)
+        viewModelScope.launch { chatPrefs?.setDetailed(value) }
+    }
+
+    // Re-reads ModelStore after Settings changes provider (Settings has its own VM).
+    fun refreshSelection() {
+        viewModelScope.launch {
+            val sel = runCatching {
+                withContext(Dispatchers.IO) { modelStore!!.selection.first() }
+            }.getOrNull() ?: return@launch
+            val providerId = sel.providerId
+            val modelId = sel.modelId
+            if (providerId.isNullOrBlank() || modelId.isNullOrBlank()) return@launch
+            if (providerId == selProvider && modelId == selModel) {
+                uiState = uiState.copy(
+                    favorites = sel.favorites,
+                    modelRecents = sel.recents
+                )
+                return@launch
+            }
+            selProvider = providerId
+            selModel = modelId
+            val limit = providers.firstOrNull { it.id == providerId }
+                ?.models?.get(modelId)?.limit?.context?.takeIf { it > 0 }
+            uiState = uiState.copy(
+                model = labelFor(providerId, modelId),
+                selectedModelKey = "$providerId/$modelId",
+                selectedProviderId = providerId,
+                selectedVariant = null,
+                variants = providers.firstOrNull { it.id == providerId }
+                    ?.models?.get(modelId)?.variants?.keys?.toList() ?: emptyList(),
+                favorites = sel.favorites,
+                modelRecents = sel.recents,
+                stats = if (limit != null) uiState.stats.copy(limit = limit) else uiState.stats
+            )
+        }
+    }
+
+    private fun loadAgents() {
+        viewModelScope.launch {
+            val client = api ?: return@launch
+            val agents = runCatching { client.getList<OpenCodeAgent>("agent") }
+                .getOrNull()
+                ?.map { it.name }
+                ?.filter { it.isNotBlank() }
+                ?: return@launch
+            // Keep the build/plan picker first; fall back to full list (AndCode parity).
+            val modes = (agents.filter { it == "build" || it == "plan" }.ifEmpty { agents })
+            uiState = uiState.copy(
+                modes = modes,
+                mode = uiState.mode?.takeIf { modes.contains(it) } ?: modes.firstOrNull()
+            )
+        }
+    }
+
+    private fun refreshSlashCatalog() {
+        viewModelScope.launch {
+            val client = api ?: return@launch
+            val commands = runCatching { client.getList<OpenCodeCommand>("command") }.getOrNull()
+            val skills = runCatching { client.getList<OpenCodeSkill>("skill") }.getOrNull()
+            commands?.let { backendCommands = it }
+            skills?.let { backendSkills = it }
+            uiState = uiState.copy(
+                slashCommands = SlashCommands.suggestions("", backendCommands, backendSkills)
+            )
+        }
+    }
+
+    fun slashSuggestions(query: String): List<SlashSuggestion> =
+        SlashCommands.suggestions(query, backendCommands, backendSkills)
+
+    /** Routes `/…` input: app commands locally, backend commands via POST command. */
+    fun handleSlashInput(text: String): Boolean {
+        val trimmed = text.trim()
+        if (!trimmed.startsWith("/")) return false
+        val firstToken = trimmed.substringBefore(" ").substringBefore("\n")
+        when (firstToken) {
+            "/new" -> { newSession(); return true }
+            "/model" -> { uiState = uiState.copy(modelSheet = true); return true }
+            "/agent" -> { uiState = uiState.copy(spacesSheet = true); return true }
+            "/help" -> {
+                uiState = uiState.copy(
+                    messages = uiState.messages + ChatMessage(
+                        id = UUID.randomUUID().toString(),
+                        isUser = false,
+                        parts = listOf(
+                            ChatPart.Text(UUID.randomUUID().toString(), slashHelpText())
+                        )
+                    )
+                )
+                return true
+            }
+        }
+        val match = SlashCommands.matchBackend(trimmed, backendCommands, backendSkills)
+        if (match != null) {
+            sendSlashCommand(match.first, match.second)
+            return true
+        }
+        return false
+    }
+
+    private fun slashHelpText(): String = buildString {
+        appendLine("Commands:")
+        SlashCommands.app.forEach { appendLine("${it.name} — ${it.description}") }
+        backendCommands.sortedBy { it.name }.forEach {
+            appendLine("/${it.name}" + (it.description?.let { d -> " — $d" } ?: ""))
+        }
+        backendSkills.sortedBy { it.name }.forEach {
+            appendLine("/${it.name}" + (it.description?.let { d -> " — $d" } ?: " (skill)"))
+        }
+    }
+
+    private fun sendSlashCommand(command: String, arguments: String) {
+        pollJob?.cancel()
+        val displayText = "/$command${arguments.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()}"
+        val userMessage = ChatMessage(
+            id = UUID.randomUUID().toString(),
+            isUser = true,
+            parts = listOf(ChatPart.Text(UUID.randomUUID().toString(), displayText))
+        )
+        uiState = uiState.copy(
+            input = "",
+            sending = true,
+            thinking = true,
+            messages = uiState.messages + userMessage
+        )
+        pollJob = viewModelScope.launch {
+            val idsBeforeSend = lastSeenIds.toSet()
+            val failed = runCatching {
+                val client = api ?: error("Not connected")
+                val id = sessionId ?: client.createSession(displayText.take(60)).also { sessionId = it }
+                val body = buildJsonObject {
+                    put("command", command)
+                    put("arguments", arguments)
+                    uiState.mode?.takeIf { it.isNotBlank() }?.let { put("agent", it) }
+                    uiState.selectedVariant?.takeIf { it.isNotBlank() }?.let { put("variant", it) }
+                }
+                client.postUnit("session/${client.encodePath(id)}/command", body)
+                pollUntilDone(client, id, idsBeforeSend)
+                withContext(Dispatchers.Main) {
+                    uiState = uiState.copy(sending = false, thinking = false)
+                }
+                refreshCost(id)
+                refreshTodos()
+                loadRecents()
+            }
+            failed.onFailure { err ->
+                if (err is kotlinx.coroutines.CancellationException) return@launch
+                uiState = uiState.copy(
+                    sending = false,
+                    thinking = false,
+                    messages = uiState.messages + ChatMessage(
+                        id = UUID.randomUUID().toString(),
+                        isUser = false,
+                        parts = listOf(ChatPart.Error(UUID.randomUUID().toString(), err.message ?: "unknown error"))
+                    )
+                )
+            }
+        }
     }
 
     private fun selectedRef(): ModelRef? =
@@ -264,6 +465,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun send() {
         val text = uiState.input.trim()
         if (text.isEmpty() || uiState.sending) return
+        if (handleSlashInput(text)) {
+            uiState = uiState.copy(input = "")
+            return
+        }
         startRun(text)
     }
 
@@ -299,10 +504,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val failed = runCatching {
                 val client = api ?: error("Not connected")
                 val id = sessionId ?: client.createSession(text.take(60)).also { sessionId = it }
-                // NOTE: our agent labels ("Native opencode") are runtimes, not server
-                // agents — sending them would 400. Server default agent applies.
+                // NOTE: uiState.agent ("Native opencode") is a local runtime label —
+                // never sent. uiState.mode (build/plan from GET agent) IS the server agent.
                 val ref = selectedRef()
                 val body = buildJsonObject {
+                    uiState.mode?.takeIf { it.isNotBlank() }?.let { put("agent", it) }
+                    uiState.selectedVariant?.takeIf { it.isNotBlank() }?.let { put("variant", it) }
                     if (ref != null) {
                         put(
                             "model",

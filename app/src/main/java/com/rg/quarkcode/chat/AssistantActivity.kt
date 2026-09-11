@@ -116,6 +116,7 @@ fun AssistantActivitySheet(
     messageId: String,
     modifier: Modifier = Modifier,
     autoExpandReasoning: Boolean = false,
+    detailedTools: Boolean = false,
     onToggleTodo: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
@@ -145,7 +146,7 @@ fun AssistantActivitySheet(
             items(parts.filter { (it as? ChatPart.Reasoning)?.text?.isNotBlank() != false }, key = { it.id }) { part ->
                 when (part) {
                     is ChatPart.Reasoning -> ReasoningCard(part = part, autoExpand = autoExpandReasoning, expanded = null, onToggle = null)
-                    is ChatPart.Tool -> QuarkToolCard(part = part, messageId = messageId, onToggleTodo = onToggleTodo)
+                    is ChatPart.Tool -> QuarkToolCard(part = part, messageId = messageId, detailed = detailedTools, onToggleTodo = onToggleTodo)
                     is ChatPart.Patch -> PatchSheetCard(files = part.files)
                     else -> Unit
                 }
@@ -212,9 +213,10 @@ fun QuarkToolCard(
     part: ChatPart.Tool,
     messageId: String,
     modifier: Modifier = Modifier,
+    detailed: Boolean = false,
     onToggleTodo: (String, String) -> Unit = { _, _ -> }
 ) {
-    var expanded by remember { mutableStateOf(part.status == ToolStatus.RUNNING || part.status == ToolStatus.PENDING) }
+    var expanded by remember { mutableStateOf(part.status == ToolStatus.RUNNING || part.status == ToolStatus.PENDING || detailed) }
     Card(
         modifier = modifier
             .fillMaxWidth()

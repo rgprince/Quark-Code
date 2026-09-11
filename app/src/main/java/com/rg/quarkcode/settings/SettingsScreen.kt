@@ -14,11 +14,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +46,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rg.quarkcode.backend.ThemeMode
@@ -59,6 +65,12 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     onProviderChange: (String) -> Unit,
     onRetryProviders: () -> Unit,
+    autoExpandReasoning: Boolean,
+    onAutoExpandChange: (Boolean) -> Unit,
+    detailedTools: Boolean,
+    onDetailedChange: (Boolean) -> Unit,
+    serverVersion: String?,
+    diagnosticsText: String,
     onNewMcpNameChange: (String) -> Unit,
     onNewMcpUrlChange: (String) -> Unit,
     onAddMcp: () -> Unit,
@@ -197,6 +209,39 @@ fun SettingsScreen(
                     }
                 }
             }
+            item(key = "chat") {
+                SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Auto-expand thinking", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = "Open reasoning cards without tapping",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = autoExpandReasoning, onCheckedChange = onAutoExpandChange)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Detailed tool cards", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = "Expand tool input/output by default",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = detailedTools, onCheckedChange = onDetailedChange)
+                    }
+                }
+            }
             item(key = "mcp") {
                 SettingsSection(title = "MCP servers (HTTP)", icon = Icons.Filled.Storage) {
                     if (state.mcpLoading) {
@@ -262,6 +307,24 @@ fun SettingsScreen(
                 }
             }
             item(key = "about") {
+                val clipboard = LocalClipboardManager.current
+                SettingsSection(title = "Server & diagnostics", icon = Icons.Filled.Dns) {
+                    Text(
+                        text = "Server version: ${serverVersion ?: "unknown — Test & save first"}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { clipboard.setText(AnnotatedString(diagnosticsText)) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Copy diagnostics")
+                    }
+                }
+            }
+            item(key = "about-app") {
                 SettingsSection(title = "About", icon = Icons.Filled.Info) {
                     Text(
                         text = "Quark Code — native opencode client. Backend: opencode web/serve on-device or remote. MCP over Streamable HTTP only.",

@@ -84,7 +84,7 @@ fun ContextSheet(
                 )
                 StatCell(
                     label = "Cost",
-                    value = "$" + "%.4f".format(stats.cost),
+                    value = formatCost(stats.cost),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -128,6 +128,10 @@ private fun formatCount(value: Long): String = when {
     value >= 1_000L -> "%.1fk".format(value / 1_000.0)
     else -> value.toString()
 }
+
+// Free models show no price; paid show 2 decimals max (detail sheet only).
+private fun formatCost(cost: Double): String =
+    if (cost <= 0.0) "Free" else "$" + "%.2f".format(cost)
 
 private fun usagePercent(stats: ContextStats): String {
     if (stats.limit <= 0L) return "—"

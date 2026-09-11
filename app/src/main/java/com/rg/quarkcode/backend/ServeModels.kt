@@ -212,3 +212,26 @@ data class McpStatus(
     val status: String? = null,
     val error: String? = null
 )
+
+// Slash catalog shapes (AndCode IA: GET command / GET skill, POST session/{id}/command).
+@Serializable
+data class OpenCodeCommand(
+    val name: String = "",
+    val description: String? = null,
+    val template: String? = null,
+    val source: String? = null
+)
+
+@Serializable
+data class OpenCodeSkill(
+    val name: String = "",
+    val description: String? = null,
+    val location: String? = null
+)
+
+@Serializable
+data class OpenCodeAgent(
+    val name: String = "",
+    val description: String? = null,
+    val mode: String? = null
+)

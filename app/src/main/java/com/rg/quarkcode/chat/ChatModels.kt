@@ -27,6 +27,13 @@ data class ProviderOption(
     val name: String
 )
 
+data class SlashSuggestion(
+    val name: String,
+    val description: String,
+    val isSkill: Boolean = false,
+    val isApp: Boolean = false
+)
+
 data class RecentSession(
     val id: String,
     val title: String
@@ -40,6 +47,13 @@ data class ChatUiState(
     val selectedProviderId: String? = null,
     val providers: List<ProviderOption> = emptyList(),
     val agent: String = "Native opencode",
+    val modes: List<String> = listOf("build", "plan"),
+    val mode: String? = null,
+    val variants: List<String> = emptyList(),
+    val selectedVariant: String? = null,
+    val slashCommands: List<SlashSuggestion> = emptyList(),
+    val autoExpandReasoning: Boolean = false,
+    val detailedTools: Boolean = false,
     val catalog: List<CatalogModel> = listOf(CatalogModel("auto", "Auto (server default)")),
     val modelRecents: List<String> = emptyList(),
     val catalogLoading: Boolean = false,

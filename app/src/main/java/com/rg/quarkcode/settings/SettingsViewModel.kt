@@ -38,6 +38,9 @@ data class SettingsUiState(
     val selectedProviderId: String? = null,
     val providersLoading: Boolean = false,
     val providersError: String? = null,
+    val autoExpandReasoning: Boolean = false,
+    val detailedTools: Boolean = false,
+    val serverVersion: String? = null,
     val mcpServers: Map<String, McpStatus> = emptyMap(),
     val mcpLoading: Boolean = false,
     val newMcpName: String = "",
@@ -51,6 +54,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val connectionStore = ConnectionStore(application)
     private val themeStore = ThemeStore(application)
     private val modelStore = com.rg.quarkcode.backend.ModelStore(application)
+    private val chatPrefs = com.rg.quarkcode.chat.ChatPrefs(application)
     private var providerModels: Map<String, List<String>> = emptyMap()
 
     var uiState by mutableStateOf(SettingsUiState())
@@ -103,6 +107,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     testResult = "Connected" + (health.version.takeIf { it.isNotBlank() }?.let { " v$it" } ?: "")
                 )
                 onSaved(connection)
+                loadProviders()
             }.onFailure { err ->
                 uiState = snapshot.copy(testing = false, testResult = err.message ?: "Unreachable")
             }
@@ -119,11 +124,66 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun loadAll() {
         loadMcp()
         loadProviders()
+        loadChatPrefs()
+        loadServerInfo()
+    }
+
+    private fun loadChatPrefs() {
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { chatPrefs.prefs.first() } }
+                .getOrNull()?.let { prefs ->
+                    uiState = uiState.copy(
+                        autoExpandReasoning = prefs.autoExpand,
+                        detailedTools = prefs.detailed
+                    )
+                }
+        }
+    }
+
+    fun setAutoExpand(value: Boolean) {
+        uiState = uiState.copy(autoExpandReasoning = value)
+        viewModelScope.launch { chatPrefs.setAutoExpand(value) }
+    }
+
+    fun setDetailedTools(value: Boolean) {
+        uiState = uiState.copy(detailedTools = value)
+        viewModelScope.launch { chatPrefs.setDetailed(value) }
+    }
+
+    private fun loadServerInfo() {
+        viewModelScope.launch {
+            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
+            val host = saved.host.ifBlank { return@launch }
+            runCatching {
+                ServeApi(host, saved.username, saved.password).get<Health>("global/health")
+            }.onSuccess { health ->
+                uiState = uiState.copy(
+                    serverVersion = health.version.takeIf { it.isNotBlank() }
+                )
+            }
+        }
+    }
+
+    fun diagnosticsText(): String = buildString {
+        appendLine("Quark Code 0.1.0 (com.rg.quarkcode)")
+        appendLine("Host: ${uiState.host}")
+        appendLine("Server: ${uiState.serverVersion ?: "unknown"}")
+        appendLine("Provider: ${uiState.selectedProviderId ?: "none"}")
+        appendLine("Theme: ${uiState.theme}")
+        appendLine("MCP servers: ${uiState.mcpServers.size}")
     }
 
     fun loadProviders() {
         viewModelScope.launch {
-            val api = client() ?: return@launch
+            // Read the SAVED connection (uiState may still hold unsaved edits or defaults
+            // while init is loading — that race made the provider list silently empty).
+            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
+            val host = saved.host.ifBlank { uiState.host }
+            if (host.isBlank()) {
+                uiState = uiState.copy(providersLoading = false, providersError = "Set the server URL first, then Test & save.")
+                return@launch
+            }
+            val api = ServeApi(host, saved.username, saved.password)
             uiState = uiState.copy(providersLoading = true, providersError = null)
             val catalog = runCatching { api.get<com.rg.quarkcode.backend.ProviderCatalog>("provider") }
                 .getOrNull()

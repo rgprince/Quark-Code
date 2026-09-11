@@ -165,6 +165,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onOpenSession = chatVm::openSession,
                                 onRetryCatalog = chatVm::retryCatalog,
                                 onAnswer = chatVm::answerQuestion,
+                                onModeChange = chatVm::onModeChange,
+                                onVariantChange = chatVm::onVariantChange,
+                                onSlashSelect = { suggestion ->
+                                    chatVm.onInputChange(suggestion.name + " ")
+                                },
                                 onOpenSettings = { backStack.add(SettingsRoute) },
                                 onMenu = { openDrawer() }
                             )
@@ -172,7 +177,10 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                         is SettingsRoute -> NavEntry(key) {
                             SettingsScreen(
                                 state = settingsVm.uiState,
-                                onBack = { backStack.removeLastOrNull() },
+                                onBack = {
+                                    backStack.removeLastOrNull()
+                                    chatVm.refreshSelection()
+                                },
                                 onHostChange = settingsVm::onHostChange,
                                 onUsernameChange = settingsVm::onUsernameChange,
                                 onPasswordChange = settingsVm::onPasswordChange,
@@ -188,6 +196,18 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onThemeChange = settingsVm::setTheme,
                                 onProviderChange = settingsVm::onProviderChange,
                                 onRetryProviders = settingsVm::loadProviders,
+                                autoExpandReasoning = settingsVm.uiState.autoExpandReasoning,
+                                onAutoExpandChange = { value ->
+                                    settingsVm.setAutoExpand(value)
+                                    chatVm.setAutoExpand(value)
+                                },
+                                detailedTools = settingsVm.uiState.detailedTools,
+                                onDetailedChange = { value ->
+                                    settingsVm.setDetailedTools(value)
+                                    chatVm.setDetailedTools(value)
+                                },
+                                serverVersion = settingsVm.uiState.serverVersion,
+                                diagnosticsText = settingsVm.diagnosticsText(),
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,

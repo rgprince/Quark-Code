@@ -44,6 +44,15 @@ Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 - [x] Settings redesign: Default provider radio (persisted), Connection, segmented Appearance, MCP Switch rows, About; `loadAll()` entry
 - [x] Theme: full Void/Paper containers (`primaryContainer`, `tertiary`, `errorContainer`, `surfaceContainer*`, `outline`) — fixes purple fallback clash
 
+## V4.1 batch — provider sync, cost, slash, modes, glow, settings extras
+- [x] Provider fix: Settings reads SAVED connection (race fixed), reloads after Test&save, `ChatViewModel.refreshSelection()` on Settings back
+- [x] Cost: composer strip removed (meter only); Context sheet `Free` when 0 else `$%.2f`
+- [x] Thinking moved to transcript tail (`ThinkingTail` pulse); stray row above composer removed; `animateItem` + `animateContentSize` + smart auto-scroll
+- [x] Slash `/` popup (app: /new /model /agent /help + `GET command`/`GET skill`), `POST session/{id}/command`; no `@` (AndCode never mapped it, no server endpoint)
+- [x] Modes: `GET agent` chip (build/plan first) + variant ThinkingChip from `model.variants`; sent as `agent`+`variant` in `prompt_async`
+- [x] Glow light: pulsing primary bar below editor while sending
+- [x] Settings extras: Chat toggles (auto-expand reasoning, detailed tools, shared `ChatPrefs` store), server version, copy-diagnostics
+
 ## Later (V4+)
 - Changes/review tab, fork/revert, slash autocomplete, terminal + file browser
 - R8 release shrink (debug APK 65M), F-Droid flavor
