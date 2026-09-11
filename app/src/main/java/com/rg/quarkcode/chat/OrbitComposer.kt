@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -197,7 +198,7 @@ fun OrbitComposer(
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(32.dp),
+            shape = RoundedCornerShape(18.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface,
             border = BorderStroke(
@@ -215,7 +216,9 @@ fun OrbitComposer(
                 MaterialTheme.colorScheme.primary
             }
             Row(
-                modifier = Modifier.padding(start = 2.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+                modifier = Modifier
+                    .padding(start = 2.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+                    .height(IntrinsicSize.Min)
             ) {
                 ModeStrip(
                     modes = modes,
@@ -278,6 +281,16 @@ fun OrbitComposer(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
+                        Text(
+                            text = meterLabel.substringBefore(" / ") +
+                                "(${(meterFraction * 100).toInt()}%)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Context $meterLabel used"
+                            }
+                        )
                         if (variants.isNotEmpty()) {
                             VariantMini(
                                 options = variants,

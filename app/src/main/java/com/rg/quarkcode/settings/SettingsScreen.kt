@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -157,6 +158,20 @@ fun SettingsScreen(
                     }
                     item(key = "connection") {
                         SettingsSection(title = "Connection", icon = Icons.Filled.Cloud) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                AssistChip(
+                                    onClick = { onHostChange("http://localhost:4096") },
+                                    label = { Text("On-device") }
+                                )
+                                AssistChip(
+                                    onClick = { onHostChange("http://192.168.1.2:4096") },
+                                    label = { Text("LAN") }
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = state.host,
                                 onValueChange = onHostChange,
@@ -228,12 +243,7 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                        }
-                    }
-                }
-                SettingsTab.CHAT -> {
-                    item(key = "chat") {
-                        SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "Text size",
                                 style = MaterialTheme.typography.bodyMedium
@@ -250,12 +260,47 @@ fun SettingsScreen(
                                         )
                                     }
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Large previews here — the chat uses it live.",
+                                text = "Live preview at this size:",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Spacer(modifier = Modifier.weight(1f))
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Text(
+                                        text = "Explain this repo",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = MaterialTheme.typography.bodyMedium.fontSize *
+                                                textScale.coerceIn(0.8f, 1.3f)
+                                        ),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "The assistant answers in the same size. The chat uses it live.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = MaterialTheme.typography.bodySmall.fontSize *
+                                        textScale.coerceIn(0.8f, 1.3f)
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                SettingsTab.CHAT -> {
+                    item(key = "chat") {
+                        SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
                             ChatToggle(
                                 title = "Auto-expand thinking",
                                 subtitle = "Open reasoning cards without tapping",
@@ -395,6 +440,23 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedButton(
+                                onClick = {
+                                    clipboard.setText(AnnotatedString("opencode serve --port 4096"))
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                            ) {
+                                Text("Copy Termux start command")
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Runs in Termux: opencode serve --port 4096 (or: opencode web --port 4096).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
                                 onClick = { clipboard.setText(AnnotatedString(diagnosticsText)) },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -408,17 +470,44 @@ fun SettingsScreen(
                     }
                     item(key = "about-app") {
                         SettingsSection(title = "About", icon = Icons.Filled.Info) {
-                            Text(
-                                text = "Quark Code — native opencode client. Backend: opencode web/serve on-device or remote. MCP over Streamable HTTP only.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            AboutRow(label = "App", value = "Quark Code v0.1.0")
+                            AboutRow(label = "Package", value = "com.rg.quarkcode")
+                            AboutRow(label = "Backend", value = "opencode web/serve, on-device or remote")
+                            AboutRow(label = "Transport", value = "HTTP + SSE (no stdio)")
+                            AboutRow(label = "MCP", value = "Streamable HTTP only")
                         }
                     }
                 }
             }
             item(key = "bottom-space") { Spacer(modifier = Modifier.height(16.dp)) }
         }
+    }
+}
+
+@Composable
+private fun AboutRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.width(88.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

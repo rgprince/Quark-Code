@@ -136,6 +136,14 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Todo card is a plain small box (no flashy container/progress)
 - [x] Question card has a proper header (icon + "Agent needs your input")
 
+## V5.4 scope — editor blunder fix + meter text + settings fill
+- [x] Fullscreen editor fixed: outer Row is height(IntrinsicSize.Min) so the
+  mode strip's fillMaxHeight stays bounded (was infinite measure)
+- [x] Token count re-added compactly beside the model icon: `12.4k(6%)`
+- [x] Editor shape 32dp → 18dp (slightly rectangular)
+- [x] Settings filled: connection quick-fill chips, Look text-size preview,
+  Termux start-command copy, About fact rows (all zero-backend-cost)
+
 ## V5.3 scope — editor rework + crash + text size + audit
 - [x] Crash on typing `/` fixed: slash list deduped by name (backend often
   redefines /help//new/…) + unique popup keys
