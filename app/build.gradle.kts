@@ -44,6 +44,7 @@ dependencies {
     implementation(libs.androidx.compose.material3.window.size)
     implementation(libs.androidx.compose.material3.navigationSuite)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material.iconsExtended)
     implementation(libs.androidx.compose.runtime)
     debugImplementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.android)

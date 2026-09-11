@@ -48,8 +48,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -123,9 +121,7 @@ fun MessageList(
                         .animateItem()
                 )
                 is TimelineEntry.Error -> Card(
-                    modifier = Modifier
-                        .animateItem()
-                        .semantics { role = Role.Alert },
+                    modifier = Modifier.animateItem(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer

@@ -52,7 +52,7 @@ fun QuarkApp(modifier: Modifier = Modifier) {
     val dark = when (themeMode) {
         ThemeMode.DARK -> true
         ThemeMode.LIGHT -> false
-        ThemeMode.SYSTEM -> systemDark
+        ThemeMode.SYSTEM, ThemeMode.DYNAMIC -> systemDark
     }
 
     QuarkTheme(dark = dark, mode = themeMode) {
