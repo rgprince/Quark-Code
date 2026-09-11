@@ -14,6 +14,14 @@
 # DataStore preferences (protobuf-backed, keep generated code).
 -keep class androidx.datastore.** { *; }
 
+# Room (WorkManager's internal DB is instantiated reflectively — without
+# this the release build dies on launch in InitializationProvider).
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    <init>(...);
+}
+
 # OkHttp/Okio/Coil/WorkManager ship their own consumer rules; silence
 # optional-platform warnings only.
 -dontwarn org.bouncycastle.**

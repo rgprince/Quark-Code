@@ -168,6 +168,13 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
   proguard-rules.pro (serialization/DataStore), debug-signed installable
   APK, v0.2.0 (code 2), workflow builds `assembleRelease` → quark-release-apk
 
+## V5.7 scope — launch-crash fix + tagged-model usage
+- [x] Fixed instant-crash on open (R8 had stripped Room's WorkDatabase_Impl
+  that WorkManager builds reflectively): keep RoomDatabase impls + entities
+- [x] Usage attributes whole sessions to a tagged model: the session's own
+  `model` tag first, else majority vote across its answers (no pro-rata math;
+  totals match the chat ring exactly)
+
 ## V5.3 scope — editor rework + crash + text size + audit
 - [x] Crash on typing `/` fixed: slash list deduped by name (backend often
   redefines /help//new/…) + unique popup keys

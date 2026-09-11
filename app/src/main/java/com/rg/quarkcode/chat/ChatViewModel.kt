@@ -1335,7 +1335,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val sIn = tok?.input ?: 0L
                 val sOut = (tok?.output ?: 0L) + (tok?.reasoning ?: 0L)
                 val sCache = tok?.cache?.read ?: 0L
-                val sTok = sIn + sOut + sCache
                 val created = session.time.created.takeIf { it > 0 } ?: now
                 tIn += sIn
                 tOut += sOut
@@ -1346,42 +1345,34 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 buckets[UsagePeriod.ALL]!!.countSession()
                 if (inWeek) buckets[UsagePeriod.WEEK]!!.countSession()
                 if (inMonth) buckets[UsagePeriod.MONTH]!!.countSession()
-                // Per-model attribution from assistant messages (best effort).
-                val messages = runCatching { client.messages(session.id) }.getOrNull()
-                    ?: emptyList()
-                val assistant = messages.filter { it.info.role == "assistant" }
-                if (assistant.isEmpty()) {
-                    buckets[UsagePeriod.ALL]!!.add("unknown", "", sIn, sOut, sCache, 0, 0.0)
-                    if (inWeek) buckets[UsagePeriod.WEEK]!!.add("unknown", "", sIn, sOut, sCache, 0, 0.0)
-                    if (inMonth) buckets[UsagePeriod.MONTH]!!.add("unknown", "", sIn, sOut, sCache, 0, 0.0)
-                } else {
-                    val groups = assistant.groupBy {
-                        val ref = it.info.model
-                        val pid = ref?.providerId.orEmpty()
-                        val mid = ref?.modelId.orEmpty()
-                        if (pid.isBlank() && mid.isBlank()) "unknown/" else "$pid/$mid"
+                // Tagged model per session: the session's own tag wins;
+                // otherwise majority vote across its assistant messages.
+                // Session-level totals are attributed whole (exact match
+                // with the chat ring), so cost needs no pro-rata split.
+                var tagPid = session.model?.providerId.orEmpty()
+                var tagMid = session.model?.modelId.orEmpty()
+                if (tagPid.isBlank() && tagMid.isBlank()) {
+                    val vote = runCatching { client.messages(session.id) }.getOrNull()
+                        ?.filter { it.info.role == "assistant" }
+                        ?.mapNotNull {
+                            val p = it.info.model?.providerId.orEmpty()
+                            val m = it.info.model?.modelId.orEmpty()
+                            if (p.isBlank() && m.isBlank()) null else p to m
+                        }
+                        ?.groupingBy { it }?.eachCount()
+                        ?.maxByOrNull { it.value }?.key
+                    if (vote != null) {
+                        tagPid = vote.first
+                        tagMid = vote.second
                     }
-                    groups.forEach { (key, list) ->
-                        val pid = key.substringBefore("/")
-                        val mid = key.substringAfter("/").ifEmpty { "unknown" }
-                        val mIn = list.sumOf { it.info.tokens?.input ?: 0L }
-                        val mOut = list.sumOf {
-                            (it.info.tokens?.output ?: 0L) + (it.info.tokens?.reasoning ?: 0L)
-                        }
-                        val mCache = list.sumOf { it.info.tokens?.cache?.read ?: 0L }
-                        val mTok = mIn + mOut + mCache
-                        val share = if (sTok > 0) mTok.toDouble() / sTok else 0.0
-                        val mCost = session.cost * share
-                        val latest = list.maxOfOrNull { it.info.time.created }?.takeIf { it > 0 }
-                            ?: created
-                        buckets[UsagePeriod.ALL]!!.add(mid, pid, mIn, mOut, mCache, list.size, mCost)
-                        if (latest >= weekCut) {
-                            buckets[UsagePeriod.WEEK]!!.add(mid, pid, mIn, mOut, mCache, list.size, mCost)
-                        }
-                        if (latest >= monthCut) {
-                            buckets[UsagePeriod.MONTH]!!.add(mid, pid, mIn, mOut, mCache, list.size, mCost)
-                        }
-                    }
+                }
+                val tagLabel = tagMid.ifEmpty { "unknown" }
+                buckets[UsagePeriod.ALL]!!.add(tagLabel, tagPid, sIn, sOut, sCache, 0, session.cost)
+                if (inWeek) {
+                    buckets[UsagePeriod.WEEK]!!.add(tagLabel, tagPid, sIn, sOut, sCache, 0, session.cost)
+                }
+                if (inMonth) {
+                    buckets[UsagePeriod.MONTH]!!.add(tagLabel, tagPid, sIn, sOut, sCache, 0, session.cost)
                 }
             }
             usageState = usageState.copy(

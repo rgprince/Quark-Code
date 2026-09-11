@@ -268,7 +268,8 @@ fun UsageScreen(
                 item(key = "footnote") {
                     Text(
                         text = "Cost is server-reported per session (free models count $0.00). " +
-                            "Per-model cost is split pro-rata by token share. Up to 30 recent sessions scanned.",
+                            "Each session is tagged with its own model when the server reports one, " +
+                            "otherwise by majority vote of its answers. Up to 30 recent sessions scanned.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -46,7 +46,10 @@ data class SessionInfo(
     @SerialName("parentID") val parentId: String? = null,
     val directory: String? = null,
     val time: SessionTime = SessionTime(),
-    val tokens: SessionTokens? = null
+    val tokens: SessionTokens? = null,
+    // Per-session tagged model when the server reports one (null-safe:
+    // unknown keys are ignored, so older servers just yield null).
+    val model: ModelRef? = null
 )
 
 @Serializable
