@@ -99,7 +99,7 @@ fun OrbitComposer(
         modifier = modifier
             .fillMaxWidth()
             .imePadding()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 4.dp)
     ) {
         if (input.startsWith("/") && slashSuggestions.isNotEmpty()) {
             Card(
@@ -201,11 +201,11 @@ fun OrbitComposer(
             ),
             tonalElevation = if (focused) 2.dp else 1.dp
         ) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
                         .semantics {
                             contentDescription = "Message input"
                         }
@@ -213,7 +213,7 @@ fun OrbitComposer(
                     if (input.isEmpty()) {
                         Text(
                             text = "/ for commands, @ for files",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -225,16 +225,16 @@ fun OrbitComposer(
                             .onFocusChanged { focused = it.isFocused }
                             .focusable(),
                         minLines = 1,
-                        maxLines = 6,
+                        maxLines = 5,
                         textStyle = TextStyle(
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = MaterialTheme.typography.bodyLarge.fontSize,
-                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+                            fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -297,7 +297,7 @@ fun OrbitComposer(
                         onClick = { if (sending) onAbort() else onSend() },
                         enabled = sending || input.isNotBlank(),
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(48.dp)
                             .semantics {
                                 contentDescription = if (sending) "Stop generating" else "Send message"
                             }
@@ -306,20 +306,20 @@ fun OrbitComposer(
                             Icon(
                                 imageVector = if (isSending) Icons.Filled.Stop else Icons.AutoMirrored.Filled.Send,
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             ModeChip(modes = modes, selected = mode, onSelect = onModeChange)
             if (variants.isNotEmpty()) {

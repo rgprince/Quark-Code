@@ -1,7 +1,10 @@
 package com.rg.quarkcode.chat
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,15 +50,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-// Expressive activity row: tonal card, split affordances — chevron expands
-// inline, "Details" opens the sheet. Never one ambiguous tap target.
+// Compact activity row: 12dp radius, single line, split affordances.
 @Composable
 fun AssistantActivityRow(
     parts: List<ChatPart>,
@@ -71,21 +77,21 @@ fun AssistantActivityRow(
     }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         color = container,
         tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (running) {
                 CircularProgressIndicator(
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(18.dp)
                         .semantics { contentDescription = "Working" },
                     strokeWidth = 2.dp
                 )
@@ -98,34 +104,34 @@ fun AssistantActivityRow(
                     } else {
                         MaterialTheme.colorScheme.primary
                     },
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Text(
                 text = (if (running) "Working… " else "") + summarizeActivity(parts),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
             IconButton(
                 onClick = onToggle,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(44.dp)
             ) {
                 Icon(
                     imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     contentDescription = if (expanded) "Collapse activity inline" else "Expand activity inline",
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
             IconButton(
                 onClick = onOpenSheet,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(44.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.OpenInFull,
                     contentDescription = "Open activity details",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -189,54 +195,51 @@ fun ReasoningCard(
     if (part.text.isBlank() && expanded == false) return
     var internal by remember { mutableStateOf(autoExpand) }
     val isOpen = expanded ?: internal
-    val tokens = remember(part.text) { "${part.text.length / 4} tokens" }
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Psychology,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Thinking · $tokens",
-                    style = MaterialTheme.typography.labelLarge,
+                    text = "Thinking",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(
                     onClick = { if (onToggle != null) onToggle() else internal = !internal },
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = if (isOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                         contentDescription = if (isOpen) "Collapse reasoning" else "Expand reasoning",
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
             if (isOpen) {
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = part.text.ifBlank { "No reasoning captured." },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = part.text.lineSequence().firstOrNull().orEmpty(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -244,6 +247,8 @@ fun ReasoningCard(
     }
 }
 
+// Terminal-style tool row: one line collapsed (dot + icon + mono name +
+// pretty summary), details only on expand. Errors auto-expand.
 @Composable
 fun QuarkToolCard(
     part: ChatPart.Tool,
@@ -252,88 +257,121 @@ fun QuarkToolCard(
     detailed: Boolean = false,
     onToggleTodo: (String, String) -> Unit = { _, _ -> }
 ) {
-    var expanded by remember { mutableStateOf(part.status == ToolStatus.RUNNING || part.status == ToolStatus.PENDING || detailed) }
+    val isSubagent = part.name.equals("task", ignoreCase = true)
+    val displayName = if (isSubagent) "subagent" else part.name
+    val summary = remember(part) { prettyToolSummary(part) }
+    var expanded by remember {
+        mutableStateOf(
+            part.status == ToolStatus.RUNNING ||
+                part.status == ToolStatus.PENDING ||
+                part.status == ToolStatus.ERROR ||
+                detailed
+        )
+    }
+    val statusColor = when (part.status) {
+        ToolStatus.COMPLETED -> MaterialTheme.colorScheme.primary
+        ToolStatus.RUNNING, ToolStatus.PENDING -> MaterialTheme.colorScheme.tertiary
+        ToolStatus.ERROR -> MaterialTheme.colorScheme.error
+        ToolStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                        .semantics {
+                            contentDescription = "Tool ${part.status.name.lowercase()}"
+                        }
+                )
                 Icon(
                     imageVector = part.name.toolCategoryIcon(),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    tint = part.name.toolCategoryTint(),
+                    modifier = Modifier.size(16.dp)
                 )
-                Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                if (summary.isNotBlank()) {
                     Text(
-                        text = part.name,
-                        style = MaterialTheme.typography.labelLarge,
+                        text = summary,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
-                    part.title?.takeIf { it.isNotBlank() }?.let { title ->
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
-                ToolStatusChip(status = part.status)
-                IconButton(
-                    onClick = { expanded = !expanded },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = if (expanded) "Collapse tool" else "Expand tool",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse tool" else "Expand tool",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
             }
             if (expanded) {
-                part.input?.takeIf { it.isNotBlank() }?.let { input ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "input", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(
-                        text = input,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
-                    )
-                }
                 part.output?.takeIf { it.isNotBlank() }?.let { output ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "output", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = (if (part.outputTruncated) "…(truncated)\n" else "") + output,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 8,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .heightIn(max = 240.dp)
+                            .heightIn(max = 160.dp)
                             .verticalScroll(rememberScrollState())
                     )
                 }
                 part.error?.takeIf { it.isNotBlank() }?.let { error ->
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = error,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = MaterialTheme.colorScheme.error
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 if (part.todos.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     TodoCard(todos = part.todos, onToggle = { todoId -> onToggleTodo(messageId, todoId) })
+                }
+                if (part.output.isNullOrBlank() && part.error.isNullOrBlank() && part.todos.isEmpty()) {
+                    part.input?.takeIf { it.isNotBlank() }?.let { input ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = input.take(300),
+                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
@@ -348,26 +386,29 @@ fun ToolStatusChip(status: ToolStatus, modifier: Modifier = Modifier) {
         ToolStatus.ERROR -> MaterialTheme.colorScheme.error
         ToolStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val container = when (status) {
-        ToolStatus.COMPLETED -> MaterialTheme.colorScheme.primaryContainer
-        ToolStatus.RUNNING, ToolStatus.PENDING -> MaterialTheme.colorScheme.tertiaryContainer
-        ToolStatus.ERROR -> MaterialTheme.colorScheme.errorContainer
-        ToolStatus.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant
-    }
     Surface(
         modifier = modifier.semantics {
             contentDescription = "Tool ${status.name.lowercase()}"
         },
         shape = RoundedCornerShape(100.dp),
-        color = container
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Text(
             text = status.name.lowercase(),
             style = MaterialTheme.typography.labelSmall,
             color = color,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
+}
+
+@Composable
+private fun String.toolCategoryTint(): Color = when (toToolCategory()) {
+    ToolCategory.COMMAND -> MaterialTheme.colorScheme.tertiary
+    ToolCategory.READ -> MaterialTheme.colorScheme.primary
+    ToolCategory.EDIT -> MaterialTheme.colorScheme.secondary
+    ToolCategory.SUBAGENT -> MaterialTheme.colorScheme.secondary
+    ToolCategory.OTHER -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 private fun String.toolCategoryIcon(): ImageVector = when (toToolCategory()) {
@@ -383,27 +424,27 @@ private fun PatchSheetCard(files: List<String>, modifier: Modifier = Modifier) {
     if (files.isEmpty()) return
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = "Patch · ${files.size} file(s)",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             files.forEach { file ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.Description,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "  $file",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                         color = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                 }

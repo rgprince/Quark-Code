@@ -134,7 +134,7 @@ fun ChatScreen(
                         todos = state.sessionTodos,
                         onToggle = null,
                         onDismiss = onDismissTodos,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -144,7 +144,7 @@ fun ChatScreen(
                     thinking = state.thinking,
                     autoExpandReasoning = state.autoExpandReasoning,
                     speakingId = state.speakingId,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     modifier = Modifier.weight(1f),
                     onTogglePart = onTogglePart,
                     onToggleTodo = onToggleTodo,
@@ -246,20 +246,17 @@ private fun QuarkEmptyState(
                 .fillMaxWidth()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Icon(
                 imageVector = Icons.Filled.Code,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .padding(8.dp)
-                    .height(96.dp)
-                    .fillMaxWidth()
+                modifier = Modifier.size(56.dp)
             )
             Text(
                 text = "What should we build?",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 textAlign = TextAlign.Center
             )
             Text(

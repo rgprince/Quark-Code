@@ -167,3 +167,38 @@ fun summarizeActivity(parts: List<ChatPart>): String {
 
 fun hideToolCallEcho(text: String): String =
     text.replace(Regex("""Called the \w+ tool with \{[^}]*\}"""), "").trim()
+
+// Compact one-line summary per tool so collapsed rows read like terminal
+// output (no raw JSON dumps). Falls back to title, then first input line.
+fun prettyToolSummary(part: ChatPart.Tool): String {
+    val input = part.input.orEmpty()
+    fun field(vararg keys: String): String? {
+        val trimmed = input.trim()
+        if (!trimmed.startsWith("{")) return null
+        return runCatching {
+            val obj = org.json.JSONObject(trimmed)
+            keys.firstNotNullOfOrNull { key ->
+                obj.optString(key, "").takeIf { it.isNotBlank() }
+            }
+        }.getOrNull()
+    }
+    val raw: String? = when (part.name.lowercase()) {
+        "bash", "shell", "exec", "command" ->
+            field("command", "cmd", "script")
+        "grep", "find", "glob", "ls", "list" ->
+            field("pattern", "query", "path", "glob")
+        "task" -> field("description", "prompt", "command")
+        "read", "edit", "write", "multiedit", "apply_patch" ->
+            field("filePath", "path", "file", "edits")
+        "webfetch" -> field("url")
+        "websearch" -> field("query")
+        "todowrite", "todo" ->
+            part.todos.takeIf { it.isNotEmpty() }?.let { todos ->
+                "${todos.count { t -> t.done }}/${todos.size} done"
+            }
+        else -> null
+    }
+    val summary = raw ?: part.title?.takeIf { it.isNotBlank() }
+    ?: input.lineSequence().firstOrNull { it.isNotBlank() }
+    return summary?.trim()?.take(90).orEmpty()
+}

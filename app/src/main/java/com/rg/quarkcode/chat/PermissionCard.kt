@@ -49,7 +49,7 @@ fun PermissionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(

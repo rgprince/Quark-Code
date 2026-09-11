@@ -69,7 +69,7 @@ fun MessageList(
     autoExpandReasoning: Boolean,
     speakingId: String?,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     detailedTools: Boolean = false,
     onTogglePart: (String) -> Unit = {},
     onToggleTodo: (String, String) -> Unit = { _, _ -> },
@@ -95,11 +95,18 @@ fun MessageList(
             listState.animateScrollToItem(last)
         }
     }
+    val hasRunningActivity = remember(timeline) {
+        timeline.any { entry ->
+            entry is TimelineEntry.Activity && entry.parts.filterIsInstance<ChatPart.Tool>().any {
+                it.status == ToolStatus.RUNNING || it.status == ToolStatus.PENDING
+            }
+        }
+    }
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(timeline, key = { it.id }, contentType = { it.javaClass.simpleName }) { entry ->
             when (entry) {
@@ -248,7 +255,8 @@ fun MessageList(
             }
         }
         // Live status lives at the transcript tail, never above the composer.
-        if (thinking) {
+        // Suppressed while a running activity row already shows progress.
+        if (thinking && !hasRunningActivity) {
             item(key = "thinking-tail") {
                 ThinkingTail(modifier = Modifier.animateItem())
             }
@@ -304,14 +312,14 @@ private fun ThinkingTail(modifier: Modifier = Modifier) {
         tonalElevation = 1.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             Text(
                 text = "Thinking…",
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -341,9 +349,9 @@ private fun UserBubble(message: ChatMessage, modifier: Modifier = Modifier) {
             contentColor = MaterialTheme.colorScheme.onPrimary,
             tonalElevation = 1.dp
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
                 SelectionContainer {
-                    Text(text = hideToolCallEcho(body), style = MaterialTheme.typography.bodyLarge)
+                    Text(text = hideToolCallEcho(body), style = MaterialTheme.typography.bodyMedium)
                 }
                 if (message.timestamp > 0L) {
                     Text(
@@ -374,7 +382,7 @@ private fun AssistantBody(text: String, modifier: Modifier = Modifier) {
                     when (block) {
                         is LiteBlock.Prose -> Text(
                             text = renderInline(block.text),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         is LiteBlock.Code -> CodeBlockCard(lang = block.lang, code = block.code)
@@ -524,20 +532,20 @@ private fun PatchInlineCard(files: List<String>, modifier: Modifier = Modifier) 
             containerColor = MaterialTheme.colorScheme.tertiaryContainer
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = "Patch · ${files.size} file(s)",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             files.forEach { file ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.Description,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "  $file",

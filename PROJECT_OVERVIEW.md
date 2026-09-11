@@ -111,3 +111,14 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Approved deps only (BOM 2025.09.01 kept): re-added window-size-class +
   adaptive-navigation-suite with approved coordinates; no markdown/coil3 adds
   (markdown-lite is dependency-free)
+
+## V5.1 scope — compact density (phone-first, from screenshots)
+- [x] Tool calls are one-line terminal rows (status dot + category-tinted icon
+  + mono name + pretty summary, no raw JSON); errors auto-expand; subagents
+  (`task`) render as violet "subagent · description" rows
+- [x] Transcript density: bodyMedium assistant text, 8dp gaps, 12dp margins,
+  slim bubbles, compact tail (hidden while activity row runs), tighter cards
+- [x] Composer slimmed (bodyMedium input, 48dp send, tighter paddings/gaps)
+- [x] Questions are single-tap FlowRow chips (no radios/confirm); empty state
+  shrunk; permission card tightened
+- [x] Settings redesigned with top tabs (Connection/Look/Chat/MCP/Server)

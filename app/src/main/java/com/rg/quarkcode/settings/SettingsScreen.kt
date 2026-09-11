@@ -33,14 +33,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -50,6 +56,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rg.quarkcode.backend.ThemeMode
 
+private enum class SettingsTab(val label: String) {
+    CONNECTION("Connection"),
+    APPEARANCE("Look"),
+    CHAT("Chat"),
+    MCP("MCP"),
+    SERVER("Server")
+}
+
+// Tabbed settings: one concern per tab instead of an endless scroll.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -81,17 +96,32 @@ fun SettingsScreen(
     onOpen: () -> Unit
 ) {
     LaunchedEffect(Unit) { onOpen() }
+    var tab by remember { mutableIntStateOf(0) }
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+            Column {
+                TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    title = { Text("Settings") }
+                )
+                ScrollableTabRow(
+                    selectedTabIndex = tab,
+                    edgePadding = 16.dp
+                ) {
+                    SettingsTab.entries.forEachIndexed { index, entry ->
+                        Tab(
+                            selected = tab == index,
+                            onClick = { tab = index },
+                            text = { Text(entry.label) }
+                        )
                     }
-                },
-                title = { Text("Settings") }
-            )
+                }
+            }
         }
     ) { paddingValues ->
         LazyColumn(
@@ -99,271 +129,296 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item(key = "providers") {
-                SettingsSection(title = "Default provider", icon = Icons.Filled.Storage) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onOpenProviders),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Providers & API keys", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = providerSummary,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-            item(key = "connection") {
-                SettingsSection(title = "Connection", icon = Icons.Filled.Cloud) {
-                    OutlinedTextField(
-                        value = state.host,
-                        onValueChange = onHostChange,
-                        label = { Text("Server URL") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = state.username,
-                        onValueChange = onUsernameChange,
-                        label = { Text("Username") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = state.password,
-                        onValueChange = onPasswordChange,
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    state.testResult?.let { result ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = result,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (result.startsWith("Connected")) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.error
+            item(key = "top-space") { Spacer(modifier = Modifier.height(4.dp)) }
+            when (SettingsTab.entries[tab]) {
+                SettingsTab.CONNECTION -> {
+                    item(key = "providers") {
+                        SettingsSection(title = "Default provider", icon = Icons.Filled.Storage) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onOpenProviders),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Providers & API keys", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = providerSummary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = onTestAndSave,
-                        enabled = !state.testing,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (state.testing) {
-                            CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
                         }
-                        Text("Test & save")
                     }
-                }
-            }
-            item(key = "appearance") {
-                SettingsSection(title = "Appearance", icon = Icons.Filled.Palette) {
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        ThemeMode.entries.forEachIndexed { index, mode ->
-                            SegmentedButton(
-                                shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
-                                selected = state.theme == mode,
-                                onClick = { onThemeChange(mode) },
-                                label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                    item(key = "connection") {
+                        SettingsSection(title = "Connection", icon = Icons.Filled.Cloud) {
+                            OutlinedTextField(
+                                value = state.host,
+                                onValueChange = onHostChange,
+                                label = { Text("Server URL") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
                             )
-                        }
-                    }
-                }
-            }
-            item(key = "chat") {
-                SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Auto-expand thinking", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = "Open reasoning cards without tapping",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = state.username,
+                                onValueChange = onUsernameChange,
+                                label = { Text("Username") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
                             )
-                        }
-                        Switch(checked = autoExpandReasoning, onCheckedChange = onAutoExpandChange)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Detailed tool cards", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = "Expand tool input/output by default",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = state.password,
+                                onValueChange = onPasswordChange,
+                                label = { Text("Password") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
                             )
-                        }
-                        Switch(checked = detailedTools, onCheckedChange = onDetailedChange)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Read replies aloud", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = "Auto speak newest answer (speaker icon replays)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(checked = autoSpeak, onCheckedChange = onAutoSpeakChange)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = { onSendBehaviorChange(if (sendBehavior == "queue") "interrupt" else "queue") }),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Send while busy", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = if (sendBehavior == "queue") "Queue behind the running turn"
-                                else "Interrupt the running turn",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            text = if (sendBehavior == "queue") "Queue" else "Interrupt",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-            item(key = "mcp") {
-                SettingsSection(title = "MCP servers (HTTP)", icon = Icons.Filled.Storage) {
-                    if (state.mcpLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    }
-                    state.mcpError?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-                    if (state.mcpServers.isEmpty() && !state.mcpLoading) {
-                        Text(
-                            text = "No servers yet. Add a Streamable-HTTP endpoint below.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    state.mcpServers.forEach { (name, status) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = name, style = MaterialTheme.typography.bodyLarge)
+                            state.testResult?.let { result ->
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = status.error ?: status.status ?: "unknown",
+                                    text = result,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (result.startsWith("Connected")) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.error
+                                    }
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = onTestAndSave,
+                                enabled = !state.testing,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                            ) {
+                                if (state.testing) {
+                                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                                }
+                                Text("Test & save")
+                            }
+                        }
+                    }
+                }
+                SettingsTab.APPEARANCE -> {
+                    item(key = "appearance") {
+                        SettingsSection(title = "Appearance", icon = Icons.Filled.Palette) {
+                            Text(
+                                text = "Void is dark, Paper is light, Dynamic follows your wallpaper (Android 12+).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                ThemeMode.entries.forEachIndexed { index, mode ->
+                                    SegmentedButton(
+                                        shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
+                                        selected = state.theme == mode,
+                                        onClick = { onThemeChange(mode) },
+                                        label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                SettingsTab.CHAT -> {
+                    item(key = "chat") {
+                        SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
+                            ChatToggle(
+                                title = "Auto-expand thinking",
+                                subtitle = "Open reasoning cards without tapping",
+                                checked = autoExpandReasoning,
+                                onCheckedChange = onAutoExpandChange
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            ChatToggle(
+                                title = "Detailed tool cards",
+                                subtitle = "Expand tool input/output by default",
+                                checked = detailedTools,
+                                onCheckedChange = onDetailedChange
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            ChatToggle(
+                                title = "Read replies aloud",
+                                subtitle = "Auto speak newest answer (speaker icon replays)",
+                                checked = autoSpeak,
+                                onCheckedChange = onAutoSpeakChange
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = { onSendBehaviorChange(if (sendBehavior == "queue") "interrupt" else "queue") }),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Send while busy", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = if (sendBehavior == "queue") "Queue behind the running turn"
+                                        else "Interrupt the running turn",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = if (sendBehavior == "queue") "Queue" else "Interrupt",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+                SettingsTab.MCP -> {
+                    item(key = "mcp") {
+                        SettingsSection(title = "MCP servers (HTTP)", icon = Icons.Filled.Storage) {
+                            if (state.mcpLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                            }
+                            state.mcpError?.let { message ->
+                                Text(
+                                    text = message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                            if (state.mcpServers.isEmpty() && !state.mcpLoading) {
+                                Text(
+                                    text = "No servers yet. Add a Streamable-HTTP endpoint below.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            val connected = status.error == null
-                            Switch(checked = connected, onCheckedChange = { onToggleMcp(name, it) })
+                            state.mcpServers.forEach { (name, status) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = name, style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            text = status.error ?: status.status ?: "unknown",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    val connected = status.error == null
+                                    Switch(checked = connected, onCheckedChange = { onToggleMcp(name, it) })
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = state.newMcpName,
+                                onValueChange = onNewMcpNameChange,
+                                label = { Text("Name") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = state.newMcpUrl,
+                                onValueChange = onNewMcpUrlChange,
+                                label = { Text("https://…/mcp") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = onAddMcp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                            ) {
+                                Text("Add server")
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = state.newMcpName,
-                        onValueChange = onNewMcpNameChange,
-                        label = { Text("Name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = state.newMcpUrl,
-                        onValueChange = onNewMcpUrlChange,
-                        label = { Text("https://…/mcp") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = onAddMcp,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Add server")
-                    }
                 }
-            }
-            item(key = "about") {
-                val clipboard = LocalClipboardManager.current
-                SettingsSection(title = "Server & diagnostics", icon = Icons.Filled.Dns) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onOpenServerInfo),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Server info", style = MaterialTheme.typography.bodyLarge)
+                SettingsTab.SERVER -> {
+                    item(key = "about") {
+                        val clipboard = LocalClipboardManager.current
+                        SettingsSection(title = "Server & diagnostics", icon = Icons.Filled.Dns) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onOpenServerInfo),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Server info", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = "Config, providers, commands, skills",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Config, providers, commands, skills",
+                                text = "Server version: ${serverVersion ?: "unknown — Test & save first"}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { clipboard.setText(AnnotatedString(diagnosticsText)) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                            ) {
+                                Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Copy diagnostics")
+                            }
+                        }
+                    }
+                    item(key = "about-app") {
+                        SettingsSection(title = "About", icon = Icons.Filled.Info) {
+                            Text(
+                                text = "Quark Code — native opencode client. Backend: opencode web/serve on-device or remote. MCP over Streamable HTTP only.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Server version: ${serverVersion ?: "unknown — Test & save first"}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { clipboard.setText(AnnotatedString(diagnosticsText)) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Copy diagnostics")
-                    }
-                }
-            }
-            item(key = "about-app") {
-                SettingsSection(title = "About", icon = Icons.Filled.Info) {
-                    Text(
-                        text = "Quark Code — native opencode client. Backend: opencode web/serve on-device or remote. MCP over Streamable HTTP only.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
             item(key = "bottom-space") { Spacer(modifier = Modifier.height(16.dp)) }
         }
+    }
+}
+
+@Composable
+private fun ChatToggle(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -441,17 +496,17 @@ private fun SettingsSection(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             content()
         }
     }
