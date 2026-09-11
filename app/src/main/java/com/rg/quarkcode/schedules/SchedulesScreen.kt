@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -122,12 +123,15 @@ fun SchedulesScreen(
                                 text = schedule.title,
                                 style = MaterialTheme.typography.titleSmall
                             )
-                            Text(
-                                text = "%02d:%02d · %s".format(
+                            val subtitle = remember(schedule.hour, schedule.minute, schedule.prompt) {
+                                "%02d:%02d · %s".format(
                                     schedule.hour,
                                     schedule.minute,
                                     schedule.prompt.take(80)
-                                ),
+                                )
+                            }
+                            Text(
+                                text = subtitle,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

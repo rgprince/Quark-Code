@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,26 +12,28 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,6 +41,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
@@ -52,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -79,6 +84,7 @@ fun OrbitComposer(
     selectedVariant: String?,
     slashSuggestions: List<SlashSuggestion>,
     atSuggestions: List<AtFile>,
+    textScale: Float = 1f,
     modifier: Modifier = Modifier,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
@@ -114,7 +120,10 @@ fun OrbitComposer(
                     modifier = Modifier.heightIn(max = 280.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
-                    items(slashSuggestions, key = { it.name }) { suggestion ->
+                    items(
+                        slashSuggestions,
+                        key = { it.name + "|" + it.isApp + "|" + it.isSkill }
+                    ) { suggestion ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -199,37 +208,37 @@ fun OrbitComposer(
             ),
             tonalElevation = if (focused) 2.dp else 1.dp
         ) {
-            val modeColor = if ((mode ?: modes.firstOrNull() ?: "build") == "plan") {
+            val currentMode = mode?.takeIf { modes.contains(it) }
+                ?: modes.firstOrNull() ?: "build"
+            val modeColor = if (currentMode == "plan") {
                 MaterialTheme.colorScheme.tertiary
             } else {
                 MaterialTheme.colorScheme.primary
             }
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                // Mode color line: primary = build, tertiary = plan.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(modeColor)
-                        .semantics {
-                            contentDescription = "Mode ${mode ?: modes.firstOrNull() ?: "build"}"
-                        }
+            Row(modifier = Modifier.padding(start = 2.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)) {
+                // Mode strip: 4dp color bar on the left edge (primary = build,
+                // tertiary = plan). Tap for menu, long-press to quick-swap.
+                ModeStrip(
+                    modes = modes,
+                    current = currentMode,
+                    color = modeColor,
+                    onSelect = onModeChange
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                        .semantics {
-                            contentDescription = "Message input"
-                        }
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .semantics {
+                                contentDescription = "Message input"
+                            }
+                    ) {
                     if (input.isEmpty()) {
                         Text(
                             text = "/ for commands, @ for files",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale
+                            ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -239,61 +248,47 @@ fun OrbitComposer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .onFocusChanged { focused = it.isFocused }
-                            .focusable(),
+                            .focusable()
+                            .verticalScroll(rememberScrollState()),
                         minLines = 1,
-                        maxLines = 5,
+                        maxLines = 4,
                         textStyle = TextStyle(
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = MaterialTheme.typography.bodyMedium.fontSize,
-                            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
+                            fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale,
+                            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * textScale
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
                     )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    AssistChip(
-                        onClick = onModelClick,
-                        label = {
-                            Text(
-                                shortModel,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 120.dp)
-                            )
-                        },
-                        leadingIcon = {
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        IconButton(
+                            onClick = onModelClick,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics {
+                                    contentDescription = "Model $shortModel, open model menu"
+                                }
+                        ) {
                             Icon(
-                                Icons.Filled.Verified,
+                                Icons.Filled.SmartToy,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        trailingIcon = {
-                            Icon(
-                                Icons.Filled.ArrowDropDown,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
-                    )
-                    ModeMini(
-                        modes = modes,
-                        selected = mode,
-                        onSelect = onModeChange
-                    )
-                    if (variants.isNotEmpty()) {
-                        VariantMini(
-                            options = variants,
-                            selected = selectedVariant,
-                            onSelect = onVariantChange
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
+                        if (variants.isNotEmpty()) {
+                            VariantMini(
+                                options = variants,
+                                selected = selectedVariant,
+                                onSelect = onVariantChange
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
                     if (queuedCount > 0) {
                         Badge(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -309,7 +304,7 @@ fun OrbitComposer(
                             )
                         }
                     }
-                    if (!sending) {
+                    if (input.isBlank() && !sending) {
                         OutlinedIconButton(
                             onClick = onMicClick,
                             modifier = Modifier.size(48.dp)
@@ -362,58 +357,51 @@ fun OrbitComposer(
     }
 }
 
-// Compact mode pill: color dot + short label, tap for menu.
-// The card-top color line carries the mode identity (build/plan).
+// Mode strip: 4dp color bar on the card's left edge (primary = build,
+// tertiary = plan). Tap opens the mode menu, long-press quick-swaps.
 @Composable
-private fun ModeMini(
+private fun ModeStrip(
     modes: List<String>,
-    selected: String?,
+    current: String,
+    color: Color,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (modes.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
-    val label = selected?.takeIf { modes.contains(it) } ?: modes.firstOrNull() ?: "build"
-    val dot = if (label == "plan") MaterialTheme.colorScheme.tertiary
-    else MaterialTheme.colorScheme.primary
-    Box(modifier = modifier) {
-        Surface(
-            shape = RoundedCornerShape(100.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    Box(
+        modifier = modifier
+            .width(20.dp)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(8.dp))
+            .combinedClickable(
+                onClick = { if (modes.size > 1) expanded = true },
+                onLongClick = {
+                    val other = modes.firstOrNull { it != current } ?: current
+                    if (other != current) onSelect(other)
+                },
+                role = Role.Button,
+                onClickLabel = "Change mode",
+                onLongClickLabel = "Swap mode"
+            )
+            .semantics { contentDescription = "Mode $current. Tap for menu, long-press to swap." },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
             modifier = Modifier
-                .heightIn(min = 40.dp)
-                .clickable(
-                    onClick = { expanded = true },
-                    role = Role.Button
-                )
-                .semantics { contentDescription = "Mode $label, change mode" }
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(dot)
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1
-                )
-            }
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            modes.forEach { entry ->
-                DropdownMenuItem(
-                    text = { Text(entry) },
-                    onClick = { onSelect(entry); expanded = false },
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-                )
-            }
+                .width(4.dp)
+                .fillMaxHeight()
+                .padding(vertical = 10.dp)
+                .clip(RoundedCornerShape(50))
+                .background(color)
+        )
+    }
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        modes.forEach { entry ->
+            DropdownMenuItem(
+                text = { Text(entry) },
+                onClick = { onSelect(entry); expanded = false },
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            )
         }
     }
 }

@@ -135,3 +135,15 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
   "Thought for 2.3s" row that expands the last reasoning (UI-local timer)
 - [x] Todo card is a plain small box (no flashy container/progress)
 - [x] Question card has a proper header (icon + "Agent needs your input")
+
+## V5.3 scope — editor rework + crash + text size + audit
+- [x] Crash on typing `/` fixed: slash list deduped by name (backend often
+  redefines /help//new/…) + unique popup keys
+- [x] Editor: mode side-strip (4dp color bar, tap = menu, long-press = swap),
+  model pill → SmartToy icon button, mic hidden while typing, input grows to
+  4 lines then inner-scrolls
+- [x] Text size control in Settings → Chat (Small 0.85 / Medium 1.0 /
+  Large 1.15, DataStore-persisted, applied to chat + composer live)
+- [x] Subagent perf/UI audit applied: bounded model sheet list, no nested
+  scroll traps (Review/ServerInfo), capped chat images, keyed drawer rows,
+  progress semantics, 48dp sheet buttons, memoized schedule subtitles

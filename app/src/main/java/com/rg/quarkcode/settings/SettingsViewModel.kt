@@ -50,6 +50,7 @@ data class SettingsUiState(
     val authDialog: ProviderAuthDialog? = null,
     val autoExpandReasoning: Boolean = false,
     val detailedTools: Boolean = false,
+    val textScale: Float = 1f,
     val serverVersion: String? = null,
     val serverConfigJson: String? = null,
     val configDraft: String = "",
@@ -153,7 +154,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 .getOrNull()?.let { prefs ->
                     uiState = uiState.copy(
                         autoExpandReasoning = prefs.autoExpand,
-                        detailedTools = prefs.detailed
+                        detailedTools = prefs.detailed,
+                        textScale = prefs.textScale
                     )
                 }
         }
@@ -162,6 +164,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAutoExpand(value: Boolean) {
         uiState = uiState.copy(autoExpandReasoning = value)
         viewModelScope.launch { chatPrefs.setAutoExpand(value) }
+    }
+
+    fun setTextScale(value: Float) {
+        val clamped = value.coerceIn(0.8f, 1.3f)
+        uiState = uiState.copy(textScale = clamped)
+        viewModelScope.launch { chatPrefs.setTextScale(clamped) }
     }
 
     fun setDetailedTools(value: Boolean) {

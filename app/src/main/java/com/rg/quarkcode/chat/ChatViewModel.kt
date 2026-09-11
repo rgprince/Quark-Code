@@ -93,7 +93,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     autoExpandReasoning = prefs.autoExpand,
                     detailedTools = prefs.detailed,
                     sendBehavior = prefs.sendBehavior,
-                    autoSpeak = prefs.autoSpeak
+                    autoSpeak = prefs.autoSpeak,
+                    textScale = prefs.textScale
                 )
             }
         }
@@ -307,6 +308,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun setDetailedTools(value: Boolean) {
         uiState = uiState.copy(detailedTools = value)
         viewModelScope.launch { chatPrefs?.setDetailed(value) }
+    }
+
+    fun setTextScale(value: Float) {
+        val clamped = value.coerceIn(0.8f, 1.3f)
+        uiState = uiState.copy(textScale = clamped)
+        viewModelScope.launch { chatPrefs?.setTextScale(clamped) }
     }
 
     // Re-reads ModelStore after Settings changes provider (Settings has its own VM).

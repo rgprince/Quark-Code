@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -174,7 +176,12 @@ fun ModelSheet(
                     }
                 }
             }
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .heightIn(max = 400.dp)
+            ) {
                 if (favoriteModels.isNotEmpty()) {
                     item(key = "fav-header") {
                         SectionHeader(title = "Favorites")

@@ -3,6 +3,7 @@ package com.rg.quarkcode.chat
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -19,13 +20,15 @@ class ChatPrefs(private val context: Context) {
         val DETAILED_TOOLS = booleanPreferencesKey("detailed_tools")
         val SEND_BEHAVIOR = stringPreferencesKey("send_behavior")
         val AUTO_SPEAK = booleanPreferencesKey("auto_speak")
+        val TEXT_SCALE = floatPreferencesKey("text_scale")
     }
 
     data class Prefs(
         val autoExpand: Boolean = false,
         val detailed: Boolean = false,
         val sendBehavior: String = "interrupt",
-        val autoSpeak: Boolean = false
+        val autoSpeak: Boolean = false,
+        val textScale: Float = 1f
     )
 
     val prefs: Flow<Prefs> = context.chatPrefsDataStore.data.map {
@@ -33,7 +36,8 @@ class ChatPrefs(private val context: Context) {
             autoExpand = it[Keys.AUTO_EXPAND] == true,
             detailed = it[Keys.DETAILED_TOOLS] == true,
             sendBehavior = it[Keys.SEND_BEHAVIOR] ?: "interrupt",
-            autoSpeak = it[Keys.AUTO_SPEAK] == true
+            autoSpeak = it[Keys.AUTO_SPEAK] == true,
+            textScale = (it[Keys.TEXT_SCALE] ?: 1f).coerceIn(0.8f, 1.3f)
         )
     }
 
@@ -51,5 +55,9 @@ class ChatPrefs(private val context: Context) {
 
     suspend fun setAutoSpeak(value: Boolean) {
         context.chatPrefsDataStore.edit { it[Keys.AUTO_SPEAK] = value }
+    }
+
+    suspend fun setTextScale(value: Float) {
+        context.chatPrefsDataStore.edit { it[Keys.TEXT_SCALE] = value.coerceIn(0.8f, 1.3f) }
     }
 }

@@ -182,6 +182,7 @@ fun ChatScreen(
                     thoughtText = lastThoughtText,
                     thoughtExpanded = thoughtExpanded,
                     onToggleThought = { thoughtExpanded = !thoughtExpanded },
+                    textScale = state.textScale,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     modifier = Modifier.weight(1f),
                     onTogglePart = onTogglePart,
@@ -197,6 +198,7 @@ fun ChatScreen(
             OrbitComposer(
                 input = state.input,
                 model = state.model,
+                textScale = state.textScale,
                 meterLabel = meterLabel(state.stats),
                 meterFraction = ringFraction(state.stats),
                 sending = busy,

@@ -195,7 +195,6 @@ private fun DiffFileCard(change: OpenCodeFileChange, modifier: Modifier = Modifi
                     modifier = Modifier
                         .heightIn(max = 320.dp)
                         .verticalScroll(rememberScrollState())
-                        .horizontalScroll(rememberScrollState())
                 )
             }
         }

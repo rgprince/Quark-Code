@@ -211,6 +211,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                     settingsVm.setDetailedTools(value)
                                     chatVm.setDetailedTools(value)
                                 },
+                                textScale = settingsVm.uiState.textScale,
+                                onTextScaleChange = { value ->
+                                    settingsVm.setTextScale(value)
+                                    chatVm.setTextScale(value)
+                                },
                                 sendBehavior = chatVm.uiState.sendBehavior,
                                 onSendBehaviorChange = chatVm::setSendBehavior,
                                 autoSpeak = chatVm.uiState.autoSpeak,

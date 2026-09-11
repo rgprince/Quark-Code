@@ -16,6 +16,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -59,7 +61,8 @@ fun ContextSheet(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp),
+                    .height(8.dp)
+                    .semantics { contentDescription = "Context usage ${usagePercent(stats)}" },
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 strokeCap = StrokeCap.Round
@@ -112,7 +115,7 @@ fun ContextSheet(
                 onClick = onExport,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(48.dp)
             ) {
                 Text("Export session")
             }
@@ -129,7 +132,7 @@ fun ContextSheet(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(48.dp)
             ) {
                 Text("Copy stats")
             }

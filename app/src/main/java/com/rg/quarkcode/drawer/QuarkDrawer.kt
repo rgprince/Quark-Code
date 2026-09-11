@@ -23,6 +23,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rg.quarkcode.chat.RecentSession
@@ -73,12 +74,14 @@ fun QuarkDrawer(
             if (recents.isNotEmpty()) {
                 DrawerHeader(title = "Recent chats")
                 recents.forEach { recent ->
-                    NavigationDrawerItem(
-                        label = { Text(recent.title, maxLines = 1) },
-                        selected = false,
-                        onClick = { onOpenSession(recent.id) },
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
+                    key(recent.id) {
+                        NavigationDrawerItem(
+                            label = { Text(recent.title, maxLines = 1) },
+                            selected = false,
+                            onClick = { onOpenSession(recent.id) },
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))

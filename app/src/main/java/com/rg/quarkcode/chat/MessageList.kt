@@ -77,6 +77,7 @@ fun MessageList(
     thoughtText: String = "",
     thoughtExpanded: Boolean = false,
     onToggleThought: () -> Unit = {},
+    textScale: Float = 1f,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     detailedTools: Boolean = false,
@@ -121,18 +122,21 @@ fun MessageList(
             when (entry) {
                 is TimelineEntry.UserMessage -> UserBubble(
                     message = entry.message,
+                    textScale = textScale,
                     modifier = Modifier.animateItem()
                 )
                 is TimelineEntry.Body -> AssistantBody(
                     text = hideToolCallEcho(entry.part.text),
+                    textScale = textScale,
                     modifier = Modifier.animateItem()
                 )
                 is TimelineEntry.Image -> AsyncImage(
                     model = entry.part.url,
                     contentDescription = entry.part.filename ?: "Attached image",
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 320.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .animateItem()
                 )
@@ -401,7 +405,11 @@ private fun ThinkingTail(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun UserBubble(message: ChatMessage, modifier: Modifier = Modifier) {
+private fun UserBubble(
+    message: ChatMessage,
+    textScale: Float = 1f,
+    modifier: Modifier = Modifier
+) {
     val body = message.text
     if (body.isBlank()) return
     Row(
@@ -425,13 +433,18 @@ private fun UserBubble(message: ChatMessage, modifier: Modifier = Modifier) {
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
                 SelectionContainer {
-                    Text(text = hideToolCallEcho(body), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = hideToolCallEcho(body),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale
+                        )
+                    )
                 }
                 if (message.timestamp > 0L) {
                     Text(
                         text = formatTime(message.timestamp),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier
                             .align(Alignment.End)
                             .padding(top = 4.dp)
@@ -443,7 +456,11 @@ private fun UserBubble(message: ChatMessage, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun AssistantBody(text: String, modifier: Modifier = Modifier) {
+private fun AssistantBody(
+    text: String,
+    textScale: Float = 1f,
+    modifier: Modifier = Modifier
+) {
     if (text.isBlank()) return
     val blocks = remember(text) { parseMarkdownLite(text) }
     Column(
@@ -456,10 +473,16 @@ private fun AssistantBody(text: String, modifier: Modifier = Modifier) {
                     when (block) {
                         is LiteBlock.Prose -> Text(
                             text = renderInline(block.text),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale
+                            ),
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        is LiteBlock.Code -> CodeBlockCard(lang = block.lang, code = block.code)
+                        is LiteBlock.Code -> CodeBlockCard(
+                            lang = block.lang,
+                            code = block.code,
+                            textScale = textScale
+                        )
                     }
                 }
             }
@@ -556,7 +579,12 @@ private fun renderInline(text: String): AnnotatedString {
 }
 
 @Composable
-private fun CodeBlockCard(lang: String, code: String, modifier: Modifier = Modifier) {
+private fun CodeBlockCard(
+    lang: String,
+    code: String,
+    textScale: Float = 1f,
+    modifier: Modifier = Modifier
+) {
     val clipboard = LocalClipboardManager.current
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -589,7 +617,10 @@ private fun CodeBlockCard(lang: String, code: String, modifier: Modifier = Modif
             }
             Text(
                 text = code,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = MaterialTheme.typography.bodySmall.fontSize * textScale
+                ),
                 color = MaterialTheme.colorScheme.onSurface
             )
         }

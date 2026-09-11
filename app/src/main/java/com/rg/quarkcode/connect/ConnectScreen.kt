@@ -74,7 +74,7 @@ fun ConnectScreen(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Native opencode, on your phone",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )

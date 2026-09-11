@@ -68,6 +68,7 @@ data class ChatUiState(
     val slashCommands: List<SlashSuggestion> = emptyList(),
     val autoExpandReasoning: Boolean = false,
     val detailedTools: Boolean = false,
+    val textScale: Float = 1f,
     val sendBehavior: String = "interrupt",
     val queuedCount: Int = 0,
     val hiddenModels: List<CatalogModel> = emptyList(),

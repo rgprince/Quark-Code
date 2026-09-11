@@ -131,7 +131,6 @@ fun ServerInfoScreen(
                             modifier = Modifier
                                 .heightIn(max = 320.dp)
                                 .verticalScroll(rememberScrollState())
-                                .horizontalScroll(rememberScrollState())
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedButton(

@@ -33,7 +33,10 @@ object SlashCommands {
             backendSkills
                 .filter { matches("/${it.name}") }
                 .map { SlashSuggestion("/${it.name}", it.description.orEmpty(), isSkill = true) }
-        return appSuggestions + backend.sortedBy { it.name }
+        // App entries win on name clashes (backend often redefines /help,
+        // /new, …). Without this the popup gets duplicate Lazy keys and the
+        // app crashes the moment "/" is typed.
+        return (appSuggestions + backend.sortedBy { it.name }).distinctBy { it.name }
     }
 
     /** Backend-known `/name` on the first line, or null (app commands handled separately). */

@@ -82,6 +82,8 @@ fun SettingsScreen(
     onAutoExpandChange: (Boolean) -> Unit,
     detailedTools: Boolean,
     onDetailedChange: (Boolean) -> Unit,
+    textScale: Float,
+    onTextScaleChange: (Float) -> Unit,
     sendBehavior: String,
     onSendBehaviorChange: (String) -> Unit,
     autoSpeak: Boolean,
@@ -232,6 +234,28 @@ fun SettingsScreen(
                 SettingsTab.CHAT -> {
                     item(key = "chat") {
                         SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
+                            Text(
+                                text = "Text size",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                listOf("Small" to 0.85f, "Medium" to 1f, "Large" to 1.15f)
+                                    .forEachIndexed { index, (label, scale) ->
+                                        SegmentedButton(
+                                            shape = SegmentedButtonDefaults.itemShape(index, 3),
+                                            selected = kotlin.math.abs(textScale - scale) < 0.01f,
+                                            onClick = { onTextScaleChange(scale) },
+                                            label = { Text(label) }
+                                        )
+                                    }
+                            }
+                            Text(
+                                text = "Large previews here — the chat uses it live.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
                             ChatToggle(
                                 title = "Auto-expand thinking",
                                 subtitle = "Open reasoning cards without tapping",
