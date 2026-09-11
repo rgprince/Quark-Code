@@ -23,9 +23,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +66,7 @@ private val bulletPattern = Regex("""^([-*+])\s+(.+)$""")
 private val orderedPattern = Regex("""^(\d+)[.)]\s+(.+)$""")
 private val tableSepPattern = Regex("""^\|?[\s:|-]+\|?$""")
 
-fun parseRichText(src: String): List<RichBlock> {
+private fun parseRichText(src: String): List<RichBlock> {
     val out = mutableListOf<RichBlock>()
     val lines = src.split("\n")
     val para = StringBuilder()
@@ -172,7 +178,7 @@ fun parseRichText(src: String): List<RichBlock> {
 
 private val inlinePattern = Regex("""(`(.+?)`)|(\*\*(.+?)\*\*)|(~~(.+?)~~)|(\[([^\]]+)\]\(([^)]+)\))|(\*([^*\n]+?)\*)""")
 
-fun renderRichInline(text: String): AnnotatedString {
+private fun renderRichInline(text: String): AnnotatedString {
     return buildAnnotatedString {
         var rest = text
         while (rest.isNotEmpty()) {
@@ -378,13 +384,13 @@ private fun StreamingCaret(
     style: androidx.compose.ui.text.TextStyle,
     modifier: Modifier = Modifier
 ) {
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "caret")
+    val transition = rememberInfiniteTransition(label = "caret")
     val alpha by transition.animateFloat(
         initialValue = 1f,
         targetValue = 0.2f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(530),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        animationSpec = infiniteRepeatable(
+            animation = tween(530),
+            repeatMode = RepeatMode.Reverse
         ),
         label = "caretAlpha"
     )

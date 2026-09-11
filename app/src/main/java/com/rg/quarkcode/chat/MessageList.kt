@@ -486,7 +486,6 @@ private fun AssistantBody(
 }
 
 @Composable
-@Composable
 private fun PatchInlineCard(files: List<String>, modifier: Modifier = Modifier) {
     if (files.isEmpty()) return
     Card(
