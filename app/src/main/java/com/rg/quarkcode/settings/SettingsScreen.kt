@@ -152,15 +152,6 @@ fun SettingsScreen(
                     }
                 }
             }
-            state.authDialog?.let { dialog ->
-                ProviderAuthDialog(
-                    dialog = dialog,
-                    onKeyChange = onAuthKeyChange,
-                    onSave = onSaveProviderKey,
-                    onDisconnect = onDisconnectProvider,
-                    onDismiss = onCloseProviderDialog
-                )
-            }
             item(key = "connection") {
                 SettingsSection(title = "Connection", icon = Icons.Filled.Cloud) {
                     OutlinedTextField(
@@ -351,6 +342,15 @@ fun SettingsScreen(
                 }
             }
             item(key = "bottom-space") { Spacer(modifier = Modifier.height(16.dp)) }
+        }
+        state.authDialog?.let { dialog ->
+            ProviderAuthDialog(
+                dialog = dialog,
+                onKeyChange = onAuthKeyChange,
+                onSave = onSaveProviderKey,
+                onDisconnect = onDisconnectProvider,
+                onDismiss = onCloseProviderDialog
+            )
         }
     }
 }
