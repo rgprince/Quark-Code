@@ -59,7 +59,7 @@ fun QuarkTopBar(
         ),
         navigationIcon = {
             IconButton(onClick = onMenu) {
-                TwoLineMenuIcon(contentDescription = "Open navigation drawer")
+                TwoLineMenuIcon(description = "Open navigation drawer")
             }
         },
         title = {
@@ -106,14 +106,14 @@ fun QuarkTopBar(
 // Two-line menu mark: Quark's drawer glyph (not the stock 3-line burger).
 @Composable
 fun TwoLineMenuIcon(
-    contentDescription: String?,
+    description: String?,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .size(48.dp)
             .semantics {
-                contentDescription = contentDescription ?: "Open navigation drawer"
+                contentDescription = description ?: "Open navigation drawer"
                 role = Role.Button
             },
         verticalArrangement = Arrangement.Center,
