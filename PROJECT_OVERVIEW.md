@@ -196,6 +196,15 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V6.1 scope — screenshot-driven fixes (drawer crash, real tokens, thinking UI)
+- [x] Drawer crash fixed (screenshot error verbatim): tolerant `ModelRef`
+  (`"model": {}` no longer kills `GET session`; multi-casing keys, `""` defaults)
+- [x] Real token count (AndCode parity): `refreshCost` reads latest non-user
+  MESSAGE tokens first (11k-class truth), session as fallback; never backwards
+- [x] Thinking UI restored: reasoning-only turns render AndCode-style
+  `Thought N time(s)` expandable rows (was skipped as "phantom noise")
+- [x] v0.4.0 (code 4), same dummy key — `adb install -r` updates
+
 ## V6 scope — OPEN_BUGS fix batch + update-ready R8 (single push)
 - [x] Variant pill restored in composer (`OrbitComposer.VariantPill`: auto + list, next to model pill; sheet section kept)
 - [x] Drawer truth: tolerant `SessionTime` (archived bool/num/string), `recentsError` surfaced in drawer with retry (no more silent empty)

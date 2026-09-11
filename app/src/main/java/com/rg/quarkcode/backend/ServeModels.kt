@@ -125,11 +125,61 @@ data class SessionStatus(
     val type: String = "idle"
 )
 
-@Serializable
+/**
+ * The drawer-empty crash in the screenshot:
+ * `Field 'modelID' is required ... missing at path: $[0].model`.
+ * This server sends `"model": {}` (empty object) on sessions, so required
+ * `providerID`/`modelID` threw and the whole `GET session` list decoded to
+ * nothing. Every field is optional with `""` default and all known key
+ * casings (`providerID`/`providerId`/`provider_id`, same for model) are
+ * accepted; a missing/empty/null model decodes to `ModelRef("", "")`
+ * instead of killing the list.
+ */
+object ModelRefSerializer : KSerializer<ModelRef> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ModelRef", PrimitiveKind.STRING)
+
+    private fun JsonObject.pick(vararg keys: String): String {
+        keys.forEach { key ->
+            (get(key) as? JsonPrimitive)?.let {
+                if (it.isString) it.content.takeIf { s -> s.isNotBlank() }?.let { v -> return v }
+                else it.longOrNull?.let { n -> return n.toString() }
+            }
+        }
+        return ""
+    }
+
+    override fun deserialize(decoder: Decoder): ModelRef {
+        if (decoder !is JsonDecoder) return ModelRef()
+        val el = decoder.decodeJsonElement()
+        if (el !is JsonObject) return ModelRef()
+        return ModelRef(
+            providerId = el.pick("providerID", "providerId", "provider_id", "provider"),
+            modelId = el.pick("modelID", "modelId", "model_id", "model", "id", "name")
+        )
+    }
+
+    override fun serialize(encoder: Encoder, value: ModelRef) {
+        if (encoder is kotlinx.serialization.json.JsonEncoder) {
+            encoder.encodeJsonElement(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("providerID", value.providerId)
+                    put("modelID", value.modelId)
+                }
+            )
+        } else {
+            encoder.encodeString("${value.providerId}/${value.modelId}")
+        }
+    }
+}
+
+@Serializable(with = ModelRefSerializer::class)
 data class ModelRef(
-    @SerialName("providerID") val providerId: String,
-    @SerialName("modelID") val modelId: String
-)
+    val providerId: String = "",
+    val modelId: String = ""
+) {
+    val isBlank: Boolean get() = providerId.isBlank() && modelId.isBlank()
+}
 
 @Serializable
 data class MessageInfo(

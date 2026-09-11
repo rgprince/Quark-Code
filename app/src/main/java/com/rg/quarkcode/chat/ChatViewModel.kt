@@ -1486,15 +1486,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             models.values.sortedByDescending { it.context }
     }
 
+    // AndCode parity: the REAL token count lives on the latest non-user
+    // MESSAGE (`info.tokens`), not on the session. This server's session
+    // tokens stay tiny/stale (screenshot: our 115 vs AndCode's real 11k),
+    // so read message-level first, session-level as fallback.
     private fun refreshCost(id: String) {
         viewModelScope.launch {
+            val msgs = runCatching { api?.messages(id) }.getOrNull()
+            val msgUsed = msgs?.asReversed()?.firstNotNullOfOrNull { m ->
+                m.info.tokens?.contextUsed
+                    ?.takeIf { !m.info.role.equals("user", ignoreCase = true) }
+            }
             val info = runCatching { api?.get<SessionInfo>("session/${api!!.encodePath(id)}") }
-                .getOrNull() ?: return@launch
-            val tokens = info.tokens
-            val serverUsed = tokens?.contextUsed ?: uiState.stats.used
+                .getOrNull()
+            val tokens = info?.tokens
+            val serverUsed = msgUsed
+                ?: tokens?.contextUsed
+                ?: uiState.stats.used
             uiState = uiState.copy(
                 stats = uiState.stats.copy(
-                    cost = info.cost,
+                    cost = info?.cost ?: uiState.stats.cost,
                     // Never let the meter run backwards when server truth lags
                     // behind streamed deltas.
                     used = maxOf(serverUsed, uiState.stats.used),

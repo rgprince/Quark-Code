@@ -205,9 +205,21 @@ fun MessageList(
                     }
                 }
                 is TimelineEntry.Activity -> {
-                    // Reasoning-only leftovers (pre-thought-line era) render
-                    // nothing: an "Activity" box with no tools is pure noise.
-                    if (entry.parts.none { it is ChatPart.Tool || it is ChatPart.Patch }) {
+                    val reasonings = entry.parts.filterIsInstance<ChatPart.Reasoning>()
+                        .filter { it.text.isNotBlank() }
+                    val hasTools = entry.parts.any { it is ChatPart.Tool || it is ChatPart.Patch }
+                    // AndCode parity: a reasoning-only turn renders "Thought N
+                    // time(s)" — it is NEVER skipped. The old code returned
+                    // here, so pure-thinking turns (like the screenshot's)
+                    // showed no thinking UI at all.
+                    if (!hasTools) {
+                        if (reasonings.isEmpty()) return@itemsIndexed
+                        ThoughtActivityRow(
+                            parts = reasonings,
+                            expanded = expandedParts.contains(entry.id),
+                            onToggle = { onTogglePart(entry.id) },
+                            modifier = Modifier.animateItem()
+                        )
                         return@itemsIndexed
                     }
                     val open = expandedParts.contains(entry.id)
@@ -399,8 +411,56 @@ private fun ThoughtDoneRow(
     }
 }
 
-private fun formatDuration(ms: Long): String =
-    if (ms < 1000L) "${ms.coerceAtLeast(0L)}ms"
+// AndCode-style thought row: "Thought N time(s)", tap expands the reasoning
+// text. Rendered for every reasoning-only activity group so thinking work is
+// never invisible.
+@Composable
+private fun ThoughtActivityRow(
+    parts: List<ChatPart.Reasoning>,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onToggle)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .semantics { contentDescription = "Thought ${parts.size} times. Tap to expand." },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Thought ${parts.size} time(s)",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        if (expanded) {
+            Spacer(modifier = Modifier.height(4.dp))
+            parts.forEach { part ->
+                Text(
+                    text = part.text,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun formatDuration(ms: Long): String =    if (ms < 1000L) "${ms.coerceAtLeast(0L)}ms"
     else "%.1fs".format(ms / 1000f)
 
 @Composable
