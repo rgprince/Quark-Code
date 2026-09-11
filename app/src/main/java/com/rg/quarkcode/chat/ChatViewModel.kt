@@ -1334,8 +1334,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             scoped.forEachIndexed { index, session ->
                 usageState = usageState.copy(
                     scanned = index + 1,
-                    total = scoped.size,
-                    sessions = scoped.size
+                    total = scoped.size
                 )
                 val tok = session.tokens
                 val sIn = tok?.input ?: 0L

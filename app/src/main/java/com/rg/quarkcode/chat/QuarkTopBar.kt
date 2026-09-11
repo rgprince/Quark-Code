@@ -112,7 +112,10 @@ fun TwoLineMenuIcon(
     Column(
         modifier = modifier
             .size(48.dp)
-            .semantics { this.contentDescription = contentDescription; role = Role.Button },
+            .semantics {
+                contentDescription = contentDescription ?: "Open navigation drawer"
+                role = Role.Button
+            },
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
