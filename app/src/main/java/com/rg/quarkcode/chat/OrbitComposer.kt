@@ -67,9 +67,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-// Expressive orbit composer: 32dp container, Assist/Filter chips,
-// 56dp XL send morphing Send<->Stop, determinate meter, 48dp targets,
-// menu-style slash/@ popups, IME-safe.
+// Expressive orbit composer: mode strip on the left edge, model icon,
+// one action row, meter slot at the bottom. Grows to 4 lines, then scrolls.
 @Composable
 fun OrbitComposer(
     input: String,
@@ -215,9 +214,9 @@ fun OrbitComposer(
             } else {
                 MaterialTheme.colorScheme.primary
             }
-            Row(modifier = Modifier.padding(start = 2.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)) {
-                // Mode strip: 4dp color bar on the left edge (primary = build,
-                // tertiary = plan). Tap for menu, long-press to quick-swap.
+            Row(
+                modifier = Modifier.padding(start = 2.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+            ) {
                 ModeStrip(
                     modes = modes,
                     current = currentMode,
@@ -229,36 +228,34 @@ fun OrbitComposer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 4.dp, vertical = 2.dp)
-                            .semantics {
-                                contentDescription = "Message input"
-                            }
+                            .semantics { contentDescription = "Message input" }
                     ) {
-                    if (input.isEmpty()) {
-                        Text(
-                            text = "/ for commands, @ for files",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale
+                        if (input.isEmpty()) {
+                            Text(
+                                text = "/ for commands, @ for files",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        BasicTextField(
+                            value = input,
+                            onValueChange = onInputChange,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focused = it.isFocused }
+                                .focusable()
+                                .verticalScroll(rememberScrollState()),
+                            minLines = 1,
+                            maxLines = 4,
+                            textStyle = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale,
+                                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * textScale
                             ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
                         )
-                    }
-                    BasicTextField(
-                        value = input,
-                        onValueChange = onInputChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { focused = it.isFocused }
-                            .focusable()
-                            .verticalScroll(rememberScrollState()),
-                        minLines = 1,
-                        maxLines = 4,
-                        textStyle = TextStyle(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale,
-                            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * textScale
-                        ),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
-                    )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
@@ -289,55 +286,54 @@ fun OrbitComposer(
                             )
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                    if (queuedCount > 0) {
-                        Badge(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.semantics {
-                                contentDescription = "$queuedCount messages queued"
+                        if (queuedCount > 0) {
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.semantics {
+                                    contentDescription = "$queuedCount messages queued"
+                                }
+                            ) {
+                                Text(
+                                    text = "Queued $queuedCount",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
                             }
-                        ) {
-                            Text(
-                                text = "Queued $queuedCount",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
                         }
-                    }
-                    if (input.isBlank() && !sending) {
-                        OutlinedIconButton(
-                            onClick = onMicClick,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.Mic,
-                                contentDescription = "Voice input",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    FilledIconButton(
-                        onClick = { if (sending) onAbort() else onSend() },
-                        enabled = sending || input.isNotBlank(),
-                        modifier = Modifier
-                            .size(48.dp)
-                            .semantics {
-                                contentDescription = if (sending) "Stop generating" else "Send message"
+                        if (input.isBlank() && !sending) {
+                            OutlinedIconButton(
+                                onClick = onMicClick,
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Mic,
+                                    contentDescription = "Voice input",
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
-                    ) {
-                        AnimatedContent(targetState = sending, label = "send-stop") { isSending ->
-                            Icon(
-                                imageVector = if (isSending) Icons.Filled.Stop else Icons.AutoMirrored.Filled.Send,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
+                        }
+                        FilledIconButton(
+                            onClick = { if (sending) onAbort() else onSend() },
+                            enabled = sending || input.isNotBlank(),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics {
+                                    contentDescription = if (sending) "Stop generating" else "Send message"
+                                }
+                        ) {
+                            AnimatedContent(targetState = sending, label = "send-stop") { isSending ->
+                                Icon(
+                                    imageVector = if (isSending) Icons.Filled.Stop else Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-        // One slot at the card bottom: sending progress while busy,
-        // context meter otherwise.
         if (sending) {
             LinearProgressIndicator(
                 modifier = Modifier
