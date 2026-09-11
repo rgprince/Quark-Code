@@ -30,7 +30,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -104,6 +106,37 @@ fun ChatScreen(
             onSpeak("auto", lastAssistantText)
         }
     }
+    // Busy = sending flags OR live work the flags can lag behind (streaming
+    // deltas, running tools). The stop button and progress follow this, so a
+    // stale idle event can never flip us back to send-arrow mid-reply.
+    val busy = state.sending || state.thinking ||
+        state.messages.any { message ->
+            message.isStreaming || message.parts.any { part ->
+                part is ChatPart.Tool &&
+                    (part.status == ToolStatus.RUNNING || part.status == ToolStatus.PENDING)
+            }
+        }
+    // Think timer: how long the last thinking phase took, shown as a tiny
+    // "Thought for 2.3s" row once it ends. Purely UI-local, no backend cost.
+    var thinkStart by remember { mutableStateOf<Long?>(null) }
+    var lastThoughtMs by remember { mutableStateOf<Long?>(null) }
+    var thoughtExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(state.thinking) {
+        if (state.thinking) {
+            thinkStart = System.currentTimeMillis()
+            lastThoughtMs = null
+            thoughtExpanded = false
+        } else {
+            thinkStart?.let {
+                lastThoughtMs = System.currentTimeMillis() - it
+                thinkStart = null
+            }
+        }
+    }
+    val lastThoughtText = remember(state.messages) {
+        state.messages.flatMap { it.parts }.filterIsInstance<ChatPart.Reasoning>()
+            .lastOrNull { it.text.isNotBlank() }?.text?.takeLast(600).orEmpty()
+    }
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -145,6 +178,10 @@ fun ChatScreen(
                     thinking = state.thinking,
                     autoExpandReasoning = state.autoExpandReasoning,
                     speakingId = state.speakingId,
+                    thoughtMs = lastThoughtMs,
+                    thoughtText = lastThoughtText,
+                    thoughtExpanded = thoughtExpanded,
+                    onToggleThought = { thoughtExpanded = !thoughtExpanded },
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     modifier = Modifier.weight(1f),
                     onTogglePart = onTogglePart,
@@ -162,7 +199,7 @@ fun ChatScreen(
                 model = state.model,
                 meterLabel = meterLabel(state.stats),
                 meterFraction = ringFraction(state.stats),
-                sending = state.sending,
+                sending = busy,
                 queuedCount = state.queuedCount,
                 modes = state.modes,
                 mode = state.mode,

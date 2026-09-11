@@ -122,3 +122,16 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Questions are single-tap FlowRow chips (no radios/confirm); empty state
   shrunk; permission card tightened
 - [x] Settings redesigned with top tabs (Connection/Look/Chat/MCP/Server)
+
+## V5.2 scope — busy correctness + composer merge + thought timing
+- [x] Send/stop bug fixed two ways: stale idle events ignored for 4s after a
+  new run (VM `ignoreIdleUntil`), and UI derives `busy` from sending flags OR
+  live streaming/running tools — stop shows whenever work is live
+- [x] `send()` treats running tools as busy (queue/interrupt, no dead taps)
+- [x] Mode strip merged into the editor: color line on top (primary = build,
+  tertiary = plan), compact mode/variant pills in the action row, meter is a
+  2dp bar in one shared slot with sending progress
+- [x] Thinking is a tiny inline row; when done it becomes a clickable
+  "Thought for 2.3s" row that expands the last reasoning (UI-local timer)
+- [x] Todo card is a plain small box (no flashy container/progress)
+- [x] Question card has a proper header (icon + "Agent needs your input")

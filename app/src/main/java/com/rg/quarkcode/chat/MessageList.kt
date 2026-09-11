@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
@@ -54,6 +58,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -68,6 +73,10 @@ fun MessageList(
     thinking: Boolean,
     autoExpandReasoning: Boolean,
     speakingId: String?,
+    thoughtMs: Long? = null,
+    thoughtText: String = "",
+    thoughtExpanded: Boolean = false,
+    onToggleThought: () -> Unit = {},
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     detailedTools: Boolean = false,
@@ -256,9 +265,20 @@ fun MessageList(
         }
         // Live status lives at the transcript tail, never above the composer.
         // Suppressed while a running activity row already shows progress.
+        // Once thinking ends, a tiny "Thought for 2.3s" row takes its place.
         if (thinking && !hasRunningActivity) {
             item(key = "thinking-tail") {
                 ThinkingTail(modifier = Modifier.animateItem())
+            }
+        } else if (!thinking && thoughtMs != null) {
+            item(key = "thought-done") {
+                ThoughtDoneRow(
+                    ms = thoughtMs,
+                    text = thoughtText,
+                    expanded = thoughtExpanded,
+                    onToggle = onToggleThought,
+                    modifier = Modifier.animateItem()
+                )
             }
         }
         // Permissions + questions render after timeline, like AndCode.
@@ -300,6 +320,60 @@ fun MessageList(
         }
     }
 }
+
+@Composable
+private fun ThoughtDoneRow(
+    ms: Long,
+    text: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(enabled = text.isNotBlank(), onClick = onToggle)
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Psychology,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = "Thought for ${formatDuration(ms)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (text.isNotBlank()) {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Hide reasoning" else "Show reasoning",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        if (expanded && text.isNotBlank()) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 8,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 24.dp, end = 8.dp, bottom = 4.dp)
+            )
+        }
+    }
+}
+
+private fun formatDuration(ms: Long): String =
+    if (ms < 1000L) "${ms.coerceAtLeast(0L)}ms"
+    else "%.1fs".format(ms / 1000f)
 
 @Composable
 private fun ThinkingTail(modifier: Modifier = Modifier) {

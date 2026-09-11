@@ -2,6 +2,7 @@ package com.rg.quarkcode.chat
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,27 +11,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AssistChip
@@ -39,10 +36,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
@@ -55,9 +50,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -201,7 +199,25 @@ fun OrbitComposer(
             ),
             tonalElevation = if (focused) 2.dp else 1.dp
         ) {
+            val modeColor = if ((mode ?: modes.firstOrNull() ?: "build") == "plan") {
+                MaterialTheme.colorScheme.tertiary
+            } else {
+                MaterialTheme.colorScheme.primary
+            }
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                // Mode color line: primary = build, tertiary = plan.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(modeColor)
+                        .semantics {
+                            contentDescription = "Mode ${mode ?: modes.firstOrNull() ?: "build"}"
+                        }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -238,7 +254,7 @@ fun OrbitComposer(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     AssistChip(
                         onClick = onModelClick,
@@ -247,7 +263,7 @@ fun OrbitComposer(
                                 shortModel,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 200.dp)
+                                modifier = Modifier.widthIn(max = 120.dp)
                             )
                         },
                         leadingIcon = {
@@ -265,6 +281,18 @@ fun OrbitComposer(
                             )
                         }
                     )
+                    ModeMini(
+                        modes = modes,
+                        selected = mode,
+                        onSelect = onModeChange
+                    )
+                    if (variants.isNotEmpty()) {
+                        VariantMini(
+                            options = variants,
+                            selected = selectedVariant,
+                            onSelect = onVariantChange
+                        )
+                    }
                     Spacer(modifier = Modifier.weight(1f))
                     if (queuedCount > 0) {
                         Badge(
@@ -313,41 +341,31 @@ fun OrbitComposer(
                 }
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            ModeChip(modes = modes, selected = mode, onSelect = onModeChange)
-            if (variants.isNotEmpty()) {
-                ThinkingChip(
-                    options = variants,
-                    selected = selectedVariant,
-                    onSelect = onVariantChange
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            ExpressiveMeter(fraction = meterFraction, label = meterLabel)
-        }
-        // Sending progress below the editor (replaces the faint glow bar).
+        // One slot at the card bottom: sending progress while busy,
+        // context meter otherwise.
         if (sending) {
             LinearProgressIndicator(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, start = 24.dp, end = 24.dp)
-                    .height(4.dp),
+                    .padding(top = 6.dp, start = 4.dp, end = 4.dp)
+                    .height(3.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        } else {
+            MeterBar(
+                fraction = meterFraction,
+                label = meterLabel,
+                modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp)
             )
         }
     }
 }
 
+// Compact mode pill: color dot + short label, tap for menu.
+// The card-top color line carries the mode identity (build/plan).
 @Composable
-private fun ModeChip(
+private fun ModeMini(
     modes: List<String>,
     selected: String?,
     onSelect: (String) -> Unit,
@@ -356,20 +374,38 @@ private fun ModeChip(
     if (modes.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
     val label = selected?.takeIf { modes.contains(it) } ?: modes.firstOrNull() ?: "build"
-    val isSelected = selected != null
+    val dot = if (label == "plan") MaterialTheme.colorScheme.tertiary
+    else MaterialTheme.colorScheme.primary
     Box(modifier = modifier) {
-        FilterChip(
-            selected = isSelected,
-            onClick = { expanded = true },
-            label = { Text(label, maxLines = 1) },
-            leadingIcon = {
-                Icon(
-                    if (isSelected) Icons.Filled.Check else Icons.Filled.Shield,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+        Surface(
+            shape = RoundedCornerShape(100.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .heightIn(min = 40.dp)
+                .clickable(
+                    onClick = { expanded = true },
+                    role = Role.Button
+                )
+                .semantics { contentDescription = "Mode $label, change mode" }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(dot)
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1
                 )
             }
-        )
+        }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             modes.forEach { entry ->
                 DropdownMenuItem(
@@ -383,7 +419,7 @@ private fun ModeChip(
 }
 
 @Composable
-private fun ThinkingChip(
+private fun VariantMini(
     options: List<String>,
     selected: String?,
     onSelect: (String?) -> Unit,
@@ -391,21 +427,37 @@ private fun ThinkingChip(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
-        FilterChip(
-            selected = selected != null,
-            onClick = { expanded = true },
-            label = { Text(selected ?: "Thinking auto", maxLines = 1) },
-            leadingIcon = {
-                Icon(Icons.Filled.Psychology, contentDescription = null, modifier = Modifier.size(18.dp))
-            },
-            trailingIcon = if (selected != null) {
-                {
-                    IconButton(onClick = { onSelect(null) }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Filled.Close, contentDescription = "Clear thinking mode", modifier = Modifier.size(16.dp))
-                    }
+        Surface(
+            shape = RoundedCornerShape(100.dp),
+            color = if (selected != null) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .heightIn(min = 40.dp)
+                .clickable(
+                    onClick = { expanded = true },
+                    role = Role.Button
+                )
+                .semantics {
+                    contentDescription = "Thinking ${selected ?: "auto"}, change thinking"
                 }
-            } else null
-        )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Psychology,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = selected ?: "auto",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1
+                )
+            }
+        }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text("Default") },
@@ -424,7 +476,7 @@ private fun ThinkingChip(
 }
 
 @Composable
-private fun ExpressiveMeter(
+private fun MeterBar(
     fraction: Float,
     label: String,
     modifier: Modifier = Modifier
@@ -434,24 +486,13 @@ private fun ExpressiveMeter(
         fraction >= 0.7f -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.primary
     }
-    Column(
+    LinearProgressIndicator(
+        progress = { fraction.coerceIn(0f, 1f) },
         modifier = modifier
-            .padding(horizontal = 2.dp)
+            .fillMaxWidth()
+            .height(2.dp)
             .semantics { contentDescription = "Context $label used" },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        LinearProgressIndicator(
-            progress = { fraction.coerceIn(0f, 1f) },
-            modifier = Modifier.width(48.dp).height(4.dp),
-            color = color,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-    }
+        color = color,
+        trackColor = MaterialTheme.colorScheme.surfaceVariant
+    )
 }

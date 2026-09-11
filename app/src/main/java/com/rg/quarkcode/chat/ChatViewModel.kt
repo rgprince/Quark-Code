@@ -48,6 +48,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var sessionId: String? = null
     private var pollJob: Job? = null
     private var eventJob: Job? = null
+    // Stale idle events from a previous turn can land just after a new
+    // startRun and wrongly clear its busy flags (send button flips back to
+    // send-arrow mid-reply, transcript looks dead). Ignore idle until this.
+    private var ignoreIdleUntil = 0L
     private var streamHost = ""
     private var streamUser = ""
     private var streamPass = ""
@@ -417,6 +421,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun sendSlashCommand(command: String, arguments: String) {
         pollJob?.cancel()
+        ignoreIdleUntil = System.currentTimeMillis() + 4000L
         val displayText = "/$command${arguments.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()}"
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
@@ -545,7 +550,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         // Busy: queue behind the running turn, or interrupt it.
-        if (uiState.sending) {
+        // (sending alone is not enough: flags can lag behind streaming/tools.)
+        if (uiState.sending || hasRunningWork()) {
             if (uiState.sendBehavior == "queue") {
                 messageQueue.add(text)
                 uiState = uiState.copy(input = "")
@@ -569,9 +575,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         startRun(text)
     }
 
+    private fun hasRunningWork(): Boolean =
+        uiState.messages.any { message ->
+            message.isStreaming || message.parts.filterIsInstance<ChatPart.Tool>().any {
+                it.status == ToolStatus.RUNNING || it.status == ToolStatus.PENDING
+            }
+        }
+
     private fun startRun(text: String) {
         pollJob?.cancel()
         stopSpeak()
+        ignoreIdleUntil = System.currentTimeMillis() + 4000L
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
             isUser = true,
@@ -946,6 +960,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     else -> null
                 }
                 if (errorSession != id) return
+                if (System.currentTimeMillis() < ignoreIdleUntil && error == null) return
                 if (error != null && !error.isAbort && error.message != null) {
                     uiState = uiState.copy(
                         messages = uiState.messages + ChatMessage(
@@ -966,6 +981,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             is ServerEvent.StatusChanged -> {
                 if (event.sessionId != id) return
                 if (event.status == "idle") {
+                    if (System.currentTimeMillis() < ignoreIdleUntil) return
                     uiState = uiState.copy(sending = false, thinking = false)
                     refreshMessages()
                     refreshTodos()
