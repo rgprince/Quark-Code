@@ -21,6 +21,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+data class ProviderChoice(
+    val id: String = "",
+    val name: String = "",
+    val connected: Boolean = true
+)
+
 data class SettingsUiState(
     val host: String = "http://localhost:4096",
     val username: String = "opencode",
@@ -28,6 +34,10 @@ data class SettingsUiState(
     val testing: Boolean = false,
     val testResult: String? = null,
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    val providers: List<ProviderChoice> = emptyList(),
+    val selectedProviderId: String? = null,
+    val providersLoading: Boolean = false,
+    val providersError: String? = null,
     val mcpServers: Map<String, McpStatus> = emptyMap(),
     val mcpLoading: Boolean = false,
     val newMcpName: String = "",
@@ -40,6 +50,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val app = application
     private val connectionStore = ConnectionStore(application)
     private val themeStore = ThemeStore(application)
+    private val modelStore = com.rg.quarkcode.backend.ModelStore(application)
+    private var providerModels: Map<String, List<String>> = emptyMap()
 
     var uiState by mutableStateOf(SettingsUiState())
         private set
@@ -101,6 +113,61 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         uiState = uiState.copy(theme = mode)
         viewModelScope.launch {
             themeStore.setMode(mode)
+        }
+    }
+
+    fun loadAll() {
+        loadMcp()
+        loadProviders()
+    }
+
+    fun loadProviders() {
+        viewModelScope.launch {
+            val api = client() ?: return@launch
+            uiState = uiState.copy(providersLoading = true, providersError = null)
+            val catalog = runCatching { api.get<com.rg.quarkcode.backend.ProviderCatalog>("provider") }
+                .getOrNull()
+                ?.takeIf { it.all.isNotEmpty() }
+                ?: runCatching { api.get<com.rg.quarkcode.backend.ProvidersResponse>("config/providers") }
+                    .getOrNull()
+                    ?.let { fallback ->
+                        com.rg.quarkcode.backend.ProviderCatalog(
+                            all = fallback.providers.map { entry ->
+                                com.rg.quarkcode.backend.OpenCodeProvider(
+                                    id = entry.id,
+                                    name = entry.name,
+                                    models = entry.models.associate { model ->
+                                        model.id to com.rg.quarkcode.backend.OpenCodeModel(id = model.id, name = model.name)
+                                    }
+                                )
+                            },
+                            default = fallback.default,
+                            connected = fallback.providers.map { it.id }
+                        )
+                    }
+                    ?.takeIf { it.all.isNotEmpty() }
+            if (catalog == null) {
+                uiState = uiState.copy(providersLoading = false, providersError = "No providers reachable. Test connection first.")
+                return@launch
+            }
+            providerModels = catalog.all.associate { p -> p.id to p.models.keys.toList() }
+            val connected = catalog.connected.toSet()
+            val sel = runCatching { withContext(Dispatchers.IO) { modelStore.selection.first() } }.getOrNull()
+            uiState = uiState.copy(
+                providersLoading = false,
+                providers = catalog.all.map { p ->
+                    ProviderChoice(p.id, p.displayName(), connected.contains(p.id))
+                },
+                selectedProviderId = sel?.providerId ?: catalog.all.firstOrNull()?.id
+            )
+        }
+    }
+
+    fun onProviderChange(providerId: String) {
+        uiState = uiState.copy(selectedProviderId = providerId)
+        viewModelScope.launch {
+            val modelId = providerModels[providerId]?.firstOrNull()
+            modelStore.selectModel(providerId, modelId)
         }
     }
 

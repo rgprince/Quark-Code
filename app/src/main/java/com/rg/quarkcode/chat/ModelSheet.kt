@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +28,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,14 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-// AndCode picker structure (Favorites / Recents / all, star toggles)
-// in Quark styling. Keys are "providerId/modelId" throughout.
+// QoL: shows only the chosen provider's models by default (AndCode showed all).
+// Provider itself is chosen in Settings; picker offers an escape-hatch "Show all".
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelSheet(
     runtime: Runtime,
     models: List<CatalogModel>,
     selectedId: String,
+    selectedProviderId: String?,
+    providerName: String,
     favorites: Set<String>,
     recents: List<String>,
     catalogLoading: Boolean,
@@ -53,18 +57,24 @@ fun ModelSheet(
     onModelChange: (String) -> Unit,
     onFavoriteToggle: (String) -> Unit,
     onRetryCatalog: () -> Unit,
+    onOpenProviderSettings: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    var showAll by remember(selectedProviderId) { mutableStateOf(false) }
     val byId = remember(models) { models.associateBy { it.id } }
-    val favoriteModels = remember(models, favorites) {
-        models.filter { favorites.contains(it.id) }
+    val scoped = remember(models, selectedProviderId, showAll) {
+        if (showAll || selectedProviderId.isNullOrBlank()) models
+        else models.filter { it.providerId == selectedProviderId }
     }
-    val recentModels = remember(models, recents) {
-        recents.mapNotNull { byId[it] }.take(3)
+    val favoriteModels = remember(scoped, favorites) {
+        scoped.filter { favorites.contains(it.id) }
     }
-    val visible = remember(models, query) {
-        if (query.isBlank()) models else models.filter {
+    val recentModels = remember(scoped, recents) {
+        recents.mapNotNull { byId[it] }.filter { showAll || it.providerId == selectedProviderId }.take(3)
+    }
+    val visible = remember(scoped, query) {
+        if (query.isBlank()) scoped else scoped.filter {
             it.label.contains(query, ignoreCase = true)
         }
     }
@@ -81,7 +91,22 @@ fun ModelSheet(
                 text = "Model & runtime",
                 style = MaterialTheme.typography.titleLarge
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (selectedProviderId.isNullOrBlank()) "No provider selected"
+                    else "Provider: $providerName (${scoped.size})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onOpenProviderSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Change")
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 Runtime.entries.forEachIndexed { index, entry ->
                     SegmentedButton(
@@ -174,12 +199,19 @@ fun ModelSheet(
                     }
                 }
                 item(key = "all-header") {
-                    SectionHeader(title = "All models")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SectionHeader(title = if (showAll) "All models" else "Models", modifier = Modifier.weight(1f))
+                        if (!selectedProviderId.isNullOrBlank()) {
+                            TextButton(onClick = { showAll = !showAll }) {
+                                Text(if (showAll) "Only mine" else "Show all")
+                            }
+                        }
+                    }
                 }
                 if (visible.isEmpty()) {
                     item(key = "all-empty") {
                         Text(
-                            text = "No models match. Check the server connection.",
+                            text = "No models here. Change provider in Settings.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 8.dp)

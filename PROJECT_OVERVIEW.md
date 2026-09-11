@@ -36,6 +36,14 @@ Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 - [x] Schedules: DataStore CRUD + WorkManager reminder notifications
 - [x] Composer: model pill full row, meter/cost strip, stable token layouts
 
+## V4 UI batch — AndCode IA, Quark tokens (batched, single push to save CI)
+- [x] Timeline grouping (`Timeline.kt`): Reasoning+Tool collapse to one Activity, blank reasoning skipped, todowrite→Todo, Text/Image/Error flush
+- [x] Bubbles: user `primary/onPrimary max 340.dp 20/20/5/20dp + HH:mm`, assistant plain selectable body (no bubble)
+- [x] `AssistantActivityRow` + bottom-sheet + `ReasoningCard` + `QuarkToolCard` (category icons, `ToolStatusChip`, monospace, 240dp output cap) + warning `PermissionCard` (Allow once / Always / Deny)
+- [x] Model picker QoL: shows only chosen provider by default + `Show all` escape + `Change provider in Settings` row
+- [x] Settings redesign: Default provider radio (persisted), Connection, segmented Appearance, MCP Switch rows, About; `loadAll()` entry
+- [x] Theme: full Void/Paper containers (`primaryContainer`, `tertiary`, `errorContainer`, `surfaceContainer*`, `outline`) — fixes purple fallback clash
+
 ## Later (V4+)
 - Changes/review tab, fork/revert, slash autocomplete, terminal + file browser
 - R8 release shrink (debug APK 65M), F-Droid flavor

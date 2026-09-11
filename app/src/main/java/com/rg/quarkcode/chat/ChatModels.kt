@@ -22,6 +22,11 @@ data class CatalogModel(
     val modelId: String = ""
 )
 
+data class ProviderOption(
+    val id: String,
+    val name: String
+)
+
 data class RecentSession(
     val id: String,
     val title: String
@@ -32,6 +37,8 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val model: String = "Auto (server default)",
     val selectedModelKey: String = "auto",
+    val selectedProviderId: String? = null,
+    val providers: List<ProviderOption> = emptyList(),
     val agent: String = "Native opencode",
     val catalog: List<CatalogModel> = listOf(CatalogModel("auto", "Auto (server default)")),
     val modelRecents: List<String> = emptyList(),

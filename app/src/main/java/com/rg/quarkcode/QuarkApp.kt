@@ -165,6 +165,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onOpenSession = chatVm::openSession,
                                 onRetryCatalog = chatVm::retryCatalog,
                                 onAnswer = chatVm::answerQuestion,
+                                onOpenSettings = { backStack.add(SettingsRoute) },
                                 onMenu = { openDrawer() }
                             )
                         }
@@ -185,11 +186,13 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                     }
                                 },
                                 onThemeChange = settingsVm::setTheme,
+                                onProviderChange = settingsVm::onProviderChange,
+                                onRetryProviders = settingsVm::loadProviders,
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,
                                 onToggleMcp = settingsVm::toggleMcp,
-                                onOpen = { settingsVm.loadMcp() }
+                                onOpen = { settingsVm.loadAll() }
                             )
                         }
                         is SchedulesRoute -> NavEntry(key) {

@@ -131,6 +131,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             )
                         }
                 },
+                providers = catalog.all.map { ProviderOption(it.id, it.displayName()) },
+                selectedProviderId = providerId,
                 model = labelFor(providerId, modelId),
                 selectedModelKey = if (providerId != null && modelId != null) {
                     "$providerId/$modelId"
@@ -171,6 +173,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(
                 model = labelFor(providerId, modelId),
                 selectedModelKey = id,
+                selectedProviderId = providerId,
                 modelSheet = false,
                 modelRecents = snapshot?.recents ?: uiState.modelRecents,
                 stats = if (limit != null) uiState.stats.copy(limit = limit) else uiState.stats
@@ -186,6 +189,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val updated = modelStore?.toggleFavorite(providerId, modelId) ?: return@launch
             uiState = uiState.copy(favorites = updated)
         }
+    }
+
+    fun onProviderChange(providerId: String) {
+        val first = uiState.catalog.firstOrNull { it.providerId == providerId }?.id ?: return
+        onModelChange(first)
     }
 
     private fun selectedRef(): ModelRef? =

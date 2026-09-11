@@ -45,6 +45,7 @@ fun ChatScreen(
     onOpenSession: (String) -> Unit,
     onRetryCatalog: () -> Unit,
     onAnswer: (String, String) -> Unit,
+    onOpenSettings: () -> Unit,
     onMenu: () -> Unit
 ) {
     Scaffold(
@@ -143,6 +144,9 @@ fun ChatScreen(
             runtime = state.runtime,
             models = state.catalog,
             selectedId = state.selectedModelKey,
+            selectedProviderId = state.selectedProviderId,
+            providerName = state.providers.firstOrNull { it.id == state.selectedProviderId }?.name
+                ?: state.selectedProviderId ?: "Auto",
             favorites = state.favorites,
             recents = state.modelRecents,
             catalogLoading = state.catalogLoading,
@@ -151,6 +155,10 @@ fun ChatScreen(
             onModelChange = onModelChange,
             onFavoriteToggle = onFavoriteToggle,
             onRetryCatalog = onRetryCatalog,
+            onOpenProviderSettings = {
+                onModelSheet(false)
+                onOpenSettings()
+            },
             onDismiss = { onModelSheet(false) }
         )
     }
