@@ -184,6 +184,18 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Recents raised to 100 sorted by recency + drawer empty hint; usage scan
   counts every non-archived chat (no 30-cap)
 
+## V5.9 scope — drawer truth + live meters + chat names + alive thinking
+- [x] Empty drawer fixed: archived filter accepts 0/null, manual "tap to
+  reload" recovery wired to a public refreshRecents()
+- [x] Token count is live: streamed deltas bump `used`, poll refreshes server
+  truth every 1.5s (was: estimate-only until turn end); model context limits
+  already applied
+- [x] Top pill shows the chat name (set on send/open/rename/recents-sync)
+- [x] Thinking shows live elapsed seconds ("thinking… 5s"); thought lines only
+  record ≥800ms phases and survive flicker (no more vanishes)
+- [x] Audit: RichText parser termination + regex precedence verified, nested
+  clickables safe, dead spacesSheet left dormant intentionally
+
 ## V5.3 scope — editor rework + crash + text size + audit
 - [x] Crash on typing `/` fixed: slash list deduped by name (backend often
   redefines /help//new/…) + unique popup keys

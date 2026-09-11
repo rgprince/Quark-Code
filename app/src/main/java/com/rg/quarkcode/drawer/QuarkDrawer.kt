@@ -28,6 +28,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -45,7 +46,8 @@ fun QuarkDrawer(
     onOpenSession: (String) -> Unit,
     onOpenReview: () -> Unit,
     onOpenSchedules: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onRefreshRecents: () -> Unit = {}
 ) {
     ModalDrawerSheet(
         modifier = modifier.width(320.dp),
@@ -99,12 +101,14 @@ fun QuarkDrawer(
                     .padding(horizontal = 16.dp)
             )
             if (recents.isEmpty()) {
-                Text(
-                    text = "No chats yet — your sessions appear here.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-                )
+                TextButton(onClick = onRefreshRecents) {
+                    Text(
+                        text = "No chats yet — tap to reload.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
             } else {
                 DrawerHeader(title = "Chats")
                 recents.forEach { recent ->

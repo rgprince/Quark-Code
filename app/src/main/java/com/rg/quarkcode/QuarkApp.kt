@@ -113,7 +113,8 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                 onOpenSettings = {
                     closeDrawer()
                     backStack.add(SettingsRoute)
-                }
+                },
+                onRefreshRecents = chatVm::refreshRecents
             )
         }
     ) {

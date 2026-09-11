@@ -121,16 +121,28 @@ fun ChatScreen(
     var thinkStart by remember { mutableStateOf<Long?>(null) }
     var lastThoughtMs by remember { mutableStateOf<Long?>(null) }
     var thoughtExpanded by remember { mutableStateOf(false) }
+    var thinkingSecs by remember { mutableStateOf(0) }
     LaunchedEffect(state.thinking) {
         if (state.thinking) {
+            // New think phase: time it, but keep the previous thought line
+            // until a real (800ms+) one completes — no flicker, no vanishes.
             thinkStart = System.currentTimeMillis()
-            lastThoughtMs = null
             thoughtExpanded = false
+            thinkingSecs = 0
+            while (true) {
+                kotlinx.coroutines.delay(1000L)
+                thinkingSecs++
+            }
         } else {
-            thinkStart?.let {
-                lastThoughtMs = System.currentTimeMillis() - it
+            thinkStart?.let { started ->
+                val ms = System.currentTimeMillis() - started
+                if (ms >= 800L) {
+                    lastThoughtMs = ms
+                    thoughtExpanded = false
+                }
                 thinkStart = null
             }
+            thinkingSecs = 0
         }
     }
     val lastThoughtText = remember(state.messages) {
@@ -179,6 +191,7 @@ fun ChatScreen(
                     messages = state.messages,
                     expandedParts = state.expandedParts,
                     thinking = state.thinking,
+                    thinkingSecs = thinkingSecs,
                     speakingId = state.speakingId,
                     thoughtMs = lastThoughtMs,
                     thoughtText = lastThoughtText,

@@ -483,6 +483,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---- Sessions ----
 
+    fun refreshRecents() {
+        loadRecents()
+    }
+
     private fun loadRecents() {
         viewModelScope.launch {
             val sessions = runCatching {
@@ -491,11 +495,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             sessions.forEach { lastSeenIds.add(it.id) }
             uiState = uiState.copy(
                 recents = sessions
-                    .filter { it.time.archived == null }
+                    .filter { it.time.archived == null || it.time.archived == 0L }
                     .sortedByDescending { it.time.updated ?: it.time.created }
                     .take(100)
                     .map { RecentSession(it.id, it.title.ifEmpty { it.id.take(8) }) }
             )
+            // Keep the top-bar chat name in sync when the open session renames.
+            val openId = sessionId
+            if (openId != null) {
+                sessions.firstOrNull { it.id == openId }?.let { current ->
+                    val title = current.title.ifEmpty { openId.take(8) }
+                    if (uiState.project != title) uiState = uiState.copy(project = title)
+                }
+            }
         }
     }
 
@@ -503,13 +515,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         pollJob?.cancel()
         sessionId = id
         streamedParts.clear()
+        val knownTitle = uiState.recents.firstOrNull { it.id == id }?.title
         uiState = uiState.copy(
             sending = true,
             thinking = false,
             messages = emptyList(),
             sessionTodos = emptyList(),
             todosVisible = true,
-            spacesSheet = false
+            spacesSheet = false,
+            project = knownTitle ?: id.take(8)
         )
         viewModelScope.launch {
             val loaded = runCatching { api?.messages(id) }
@@ -604,7 +618,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             messages = uiState.messages.filterNot { message ->
                 message.parts.filterIsInstance<ChatPart.Error>().isNotEmpty() && !message.isUser
             } + userMessage,
-            stats = uiState.stats.copy(used = uiState.stats.used + estimateTokens(text))
+            stats = uiState.stats.copy(used = uiState.stats.used + estimateTokens(text)),
+            project = if (sessionId == null) text.take(60) else uiState.project
         )
         pollJob = viewModelScope.launch {
             val idsBeforeSend = lastSeenIds.toSet()
@@ -685,8 +700,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val stillActive = { sessionId == id }
         val finished = withTimeoutOrNull(120_000L) {
             while (stillActive() && uiState.sending) {
-                delay(3000L)
+                delay(1500L)
                 if (!stillActive() || !uiState.sending) return@withTimeoutOrNull
+                // Keep the token ring truthful mid-turn, not just at the end.
+                refreshCost(id)
                 val retain = streamedParts.keys.toSet()
                 runCatching { client.messages(id) }.onSuccess { serverMessages ->
                     if (!stillActive()) return@onSuccess
@@ -757,7 +774,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             messages = emptyList(),
             sessionTodos = emptyList(),
             todosVisible = true,
-            spacesSheet = false
+            spacesSheet = false,
+            project = "New chat"
         )
     }
 
@@ -825,6 +843,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }.onSuccess {
                 reviewState = reviewState.copy(savingTitle = false)
+                uiState = uiState.copy(project = title)
                 loadRecents()
             }.onFailure { err ->
                 reviewState = reviewState.copy(
@@ -888,7 +907,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 upsertStreamedPart(event.messageId, streamedParts[event.partId]!!)
                 if (event.field == "text") {
-                    uiState = uiState.copy(thinking = false)
+                    // Live token climb: server truth lands at turn end via
+                    // refreshCost; until then grow by the streamed delta so
+                    // the meter is never stuck on the typed estimate.
+                    val bump = (event.delta.length / 4).coerceAtLeast(1).toLong()
+                    uiState = uiState.copy(
+                        thinking = false,
+                        stats = uiState.stats.copy(used = uiState.stats.used + bump)
+                    )
                 }
             }
             is ServerEvent.PartUpdated -> {

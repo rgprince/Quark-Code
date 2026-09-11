@@ -70,6 +70,7 @@ fun MessageList(
     messages: List<ChatMessage>,
     expandedParts: Set<String>,
     thinking: Boolean,
+    thinkingSecs: Int = 0,
     speakingId: String?,
     thoughtMs: Long? = null,
     thoughtText: String = "",
@@ -288,7 +289,10 @@ fun MessageList(
         // Suppressed while a running activity row already shows progress.
         if (thinking && !hasRunningActivity) {
             item(key = "thinking-tail") {
-                ThinkingTail(modifier = Modifier.animateItem())
+                ThinkingTail(
+                    seconds = thinkingSecs,
+                    modifier = Modifier.animateItem()
+                )
             }
         }
         // Permissions + questions render after timeline, like AndCode.
@@ -391,7 +395,10 @@ private fun formatDuration(ms: Long): String =
     else "%.1fs".format(ms / 1000f)
 
 @Composable
-private fun ThinkingTail(modifier: Modifier = Modifier) {
+private fun ThinkingTail(
+    seconds: Int = 0,
+    modifier: Modifier = Modifier
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -409,7 +416,7 @@ private fun ThinkingTail(modifier: Modifier = Modifier) {
         )
         CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
         Text(
-            text = "thinking…",
+            text = if (seconds >= 3) "thinking… ${seconds}s" else "thinking…",
             style = MaterialTheme.typography.labelMedium.copy(
                 fontStyle = FontStyle.Italic
             ),

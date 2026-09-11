@@ -133,5 +133,5 @@ data class ChatUiState(
     val modelSheet: Boolean = false,
     val spacesSheet: Boolean = false,
     val contextSheet: Boolean = false,
-    val project: String = "local"
+    val project: String = "New chat"
 )
