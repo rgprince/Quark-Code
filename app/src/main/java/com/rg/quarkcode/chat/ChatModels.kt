@@ -39,6 +39,15 @@ data class RecentSession(
     val title: String
 )
 
+data class ReviewState(
+    val files: List<com.rg.quarkcode.backend.OpenCodeFileChange> = emptyList(),
+    val loading: Boolean = false,
+    val error: String? = null,
+    val title: String = "",
+    val savingTitle: Boolean = false,
+    val summarizing: Boolean = false
+)
+
 data class ChatUiState(
     val input: String = "",
     val messages: List<ChatMessage> = emptyList(),
@@ -60,6 +69,7 @@ data class ChatUiState(
     val catalogError: String? = null,
     val recents: List<RecentSession> = emptyList(),
     val sessionTodos: List<TodoItem> = emptyList(),
+    val todosVisible: Boolean = true,
     val connected: Boolean = false,
     val runtime: Runtime = Runtime.NATIVE,
     val favorites: Set<String> = emptySet(),

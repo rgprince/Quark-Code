@@ -1,5 +1,6 @@
 package com.rg.quarkcode.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -65,6 +66,11 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     onProviderChange: (String) -> Unit,
     onRetryProviders: () -> Unit,
+    onOpenProviderDialog: (String) -> Unit,
+    onAuthKeyChange: (String) -> Unit,
+    onSaveProviderKey: () -> Unit,
+    onDisconnectProvider: () -> Unit,
+    onCloseProviderDialog: () -> Unit,
     autoExpandReasoning: Boolean,
     onAutoExpandChange: (Boolean) -> Unit,
     detailedTools: Boolean,
@@ -121,7 +127,9 @@ fun SettingsScreen(
                     }
                     state.providers.forEach { provider ->
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenProviderDialog(provider.id) },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -131,7 +139,7 @@ fun SettingsScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(text = provider.name, style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    text = if (provider.connected) "Connected" else "Not connected",
+                                    text = if (provider.connected) "Connected · tap for API key" else "Not connected · tap to add key",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (provider.connected) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.error
@@ -143,6 +151,15 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+            state.authDialog?.let { dialog ->
+                ProviderAuthDialog(
+                    dialog = dialog,
+                    onKeyChange = onAuthKeyChange,
+                    onSave = onSaveProviderKey,
+                    onDisconnect = onDisconnectProvider,
+                    onDismiss = onCloseProviderDialog
+                )
             }
             item(key = "connection") {
                 SettingsSection(title = "Connection", icon = Icons.Filled.Cloud) {
@@ -336,6 +353,64 @@ fun SettingsScreen(
             item(key = "bottom-space") { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
+}
+
+@Composable
+private fun ProviderAuthDialog(
+    dialog: ProviderAuthDialog,
+    onKeyChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDisconnect: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(dialog.providerName) },
+        text = {
+            Column {
+                if (dialog.methodLabels.isNotEmpty()) {
+                    Text(
+                        text = "Auth: " + dialog.methodLabels.joinToString(", "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                OutlinedTextField(
+                    value = dialog.apiKey,
+                    onValueChange = onKeyChange,
+                    label = { Text("API key") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                dialog.error?.let { message ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onSave, enabled = !dialog.saving) {
+                Text("Save key")
+            }
+        },
+        dismissButton = {
+            Row {
+                OutlinedButton(onClick = onDisconnect, enabled = !dialog.saving) {
+                    Text("Disconnect")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
+        }
+    )
 }
 
 @Composable

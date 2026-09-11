@@ -1,31 +1,45 @@
 package com.rg.quarkcode.chat
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 
-// Webview todo overlay as an inline Kai-style card with progress dots.
+// Session todo strip: collapsible + dismissible so it never pins screen space.
 @Composable
 fun TodoCard(
     todos: List<TodoItem>,
     modifier: Modifier = Modifier,
-    onToggle: ((String) -> Unit)? = null
+    onToggle: ((String) -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null
 ) {
     if (todos.isEmpty()) return
+    var collapsed by remember { mutableStateOf(false) }
     val done = todos.count { it.done }
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -39,33 +53,56 @@ fun TodoCard(
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            Text(
-                text = "Tasks $done/${todos.size}",
-                style = MaterialTheme.typography.titleSmall
-            )
-            todos.forEach { todo ->
-                Row(
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Tasks $done/${todos.size}",
+                    style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = todo.done,
-                        enabled = onToggle != null,
-                        onCheckedChange = { onToggle?.invoke(todo.id) }
+                        .weight(1f)
+                        .clickable { collapsed = !collapsed }
+                )
+                IconButton(onClick = { collapsed = !collapsed }) {
+                    Icon(
+                        imageVector = if (collapsed) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
+                        contentDescription = if (collapsed) "Expand" else "Collapse",
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = todo.text,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            textDecoration = if (todo.done) {
-                                TextDecoration.LineThrough
-                            } else {
-                                TextDecoration.None
-                            }
+                }
+                if (onDismiss != null) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Dismiss",
+                            modifier = Modifier.size(18.dp)
                         )
-                    )
+                    }
+                }
+            }
+            if (!collapsed) {
+                todos.forEach { todo ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = todo.done,
+                            enabled = onToggle != null,
+                            onCheckedChange = { onToggle?.invoke(todo.id) }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = todo.text,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                textDecoration = if (todo.done) {
+                                    TextDecoration.LineThrough
+                                } else {
+                                    TextDecoration.None
+                                }
+                            )
+                        )
+                    }
                 }
             }
         }

@@ -41,6 +41,7 @@ fun ChatScreen(
     onModeChange: (String) -> Unit,
     onVariantChange: (String?) -> Unit,
     onSlashSelect: (SlashSuggestion) -> Unit,
+    onDismissTodos: () -> Unit,
     onOpenSettings: () -> Unit,
     onMenu: () -> Unit
 ) {
@@ -78,10 +79,11 @@ fun ChatScreen(
                     )
                 }
             } else {
-                if (state.sessionTodos.isNotEmpty()) {
+                if (state.sessionTodos.isNotEmpty() && state.todosVisible) {
                     TodoCard(
                         todos = state.sessionTodos,
-                        onToggle = null
+                        onToggle = null,
+                        onDismiss = onDismissTodos
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -180,7 +182,7 @@ private fun ringFraction(stats: ContextStats): Float {
 
 private fun ringLabel(stats: ContextStats): String {
     if (stats.limit <= 0L) return "—"
-    val pct = ((stats.used.coerceAtLeast(0L) * 100) / stats.limit).coerceAtMost(999L)
+    val pct = ((stats.used.coerceAtLeast(0L) * 100) / stats.limit).coerceAtMost(100L)
     return "$pct%"
 }
 

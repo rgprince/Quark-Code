@@ -59,6 +59,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var lastSeenIds = mutableSetOf<String>()
     private val streamedParts = mutableMapOf<String, ChatPart>()
 
+    val hasSession: Boolean get() = sessionId != null
+
     fun attach(host: String, username: String, password: String) {
         api = ServeApi(host, username, password)
         modelStore = ModelStore(app)
@@ -430,6 +432,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             thinking = false,
             messages = emptyList(),
             sessionTodos = emptyList(),
+            todosVisible = true,
             spacesSheet = false
         )
         viewModelScope.launch {
@@ -648,6 +651,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             thinking = false,
             messages = emptyList(),
             sessionTodos = emptyList(),
+            todosVisible = true,
             spacesSheet = false
         )
     }
@@ -661,6 +665,93 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 newSession()
             }
             loadRecents()
+        }
+    }
+
+    // ---- Review (AndCode IA: session diff + rename + summarize) ----
+
+    var reviewState by mutableStateOf(ReviewState())
+        private set
+
+    fun openReview() {
+        val id = sessionId
+        reviewState = reviewState.copy(
+            title = uiState.recents.firstOrNull { it.id == id }?.title.orEmpty()
+        )
+        loadDiff()
+    }
+
+    fun loadDiff() {
+        val id = sessionId ?: run {
+            reviewState = reviewState.copy(error = "No open session.")
+            return
+        }
+        reviewState = reviewState.copy(loading = true, error = null)
+        viewModelScope.launch {
+            runCatching {
+                api?.getList<com.rg.quarkcode.backend.OpenCodeFileChange>(
+                    "session/${api!!.encodePath(id)}/diff"
+                )
+            }.onSuccess { files ->
+                reviewState = reviewState.copy(loading = false, files = files ?: emptyList())
+            }.onFailure { err ->
+                reviewState = reviewState.copy(
+                    loading = false,
+                    error = err.message ?: "Could not load diff"
+                )
+            }
+        }
+    }
+
+    fun onReviewTitleChange(value: String) {
+        reviewState = reviewState.copy(title = value)
+    }
+
+    fun saveReviewTitle() {
+        val id = sessionId ?: return
+        val title = reviewState.title.trim()
+        if (title.isEmpty()) return
+        reviewState = reviewState.copy(savingTitle = true)
+        viewModelScope.launch {
+            runCatching {
+                api?.patch<JsonObject>(
+                    "session/${api!!.encodePath(id)}",
+                    buildJsonObject { put("title", title) }
+                )
+            }.onSuccess {
+                reviewState = reviewState.copy(savingTitle = false)
+                loadRecents()
+            }.onFailure { err ->
+                reviewState = reviewState.copy(
+                    savingTitle = false,
+                    error = err.message ?: "Could not rename"
+                )
+            }
+        }
+    }
+
+    fun summarizeSession() {
+        val id = sessionId ?: return
+        val ref = selectedRef()
+        reviewState = reviewState.copy(summarizing = true, error = null)
+        viewModelScope.launch {
+            runCatching {
+                api?.post<Boolean>(
+                    "session/${api!!.encodePath(id)}/summarize",
+                    buildJsonObject {
+                        put("providerID", ref?.providerId ?: "")
+                        put("modelID", ref?.modelId ?: "")
+                    }
+                )
+            }.onSuccess {
+                reviewState = reviewState.copy(summarizing = false)
+                refreshMessages()
+            }.onFailure { err ->
+                reviewState = reviewState.copy(
+                    summarizing = false,
+                    error = err.message ?: "Could not summarize"
+                )
+            }
         }
     }
 
@@ -800,6 +891,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun upsertStreamedPart(messageId: String, part: ChatPart) {
+        // Kill the tail "Thinking…" the moment real content streams in —
+        // waiting for poll/idle caused the visible lag after answers arrived.
+        val hasContent = when (part) {
+            is ChatPart.Text -> part.text.isNotBlank()
+            is ChatPart.Reasoning -> part.text.isNotBlank()
+            is ChatPart.Tool, is ChatPart.Patch, is ChatPart.Image -> true
+            else -> false
+        }
         val current = uiState.messages
         val index = current.indexOfFirst { it.id == messageId }
         if (index < 0) {
@@ -809,7 +908,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     isUser = false,
                     parts = listOf(part),
                     isStreaming = true
-                )
+                ),
+                thinking = if (hasContent) false else uiState.thinking
             )
         } else {
             val message = current[index]
@@ -823,7 +923,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             uiState = uiState.copy(
-                messages = current.toMutableList().also { it[index] = updated }
+                messages = current.toMutableList().also { it[index] = updated },
+                thinking = if (hasContent) false else uiState.thinking
             )
         }
     }
@@ -835,8 +936,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val mapped = list.mapNotNull { it.toUiMessage() }
             val fresh = mapped.filter { lastSeenIds.add(it.id) }
             val added = fresh.sumOf { estimateTokens(it.text) }
+            val answered = mapped.any { message ->
+                !message.isUser && message.parts.any { part ->
+                    (part is ChatPart.Text && part.text.isNotBlank()) || part is ChatPart.Tool
+                }
+            }
             uiState = uiState.copy(
                 messages = mergeReloadedMessages(mapped, uiState.messages, streamedParts.keys.toSet()),
+                thinking = if (answered) false else uiState.thinking,
                 stats = uiState.stats.copy(
                     used = uiState.stats.used + added,
                     output = uiState.stats.output + added
@@ -1002,17 +1109,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val todos = runCatching {
                 api?.getList<ServerTodo>("session/${api!!.encodePath(id)}/todo")
             }.getOrNull() ?: return@launch
+            val mapped = todos.mapIndexed { index, todo ->
+                TodoItem(
+                    id = "srv-$index",
+                    text = todo.content,
+                    done = todo.status.equals("completed", ignoreCase = true) ||
+                        todo.status.equals("done", ignoreCase = true)
+                )
+            }
             uiState = uiState.copy(
-                sessionTodos = todos.mapIndexed { index, todo ->
-                    TodoItem(
-                        id = "srv-$index",
-                        text = todo.content,
-                        done = todo.status.equals("completed", ignoreCase = true) ||
-                            todo.status.equals("done", ignoreCase = true)
-                    )
-                }
+                sessionTodos = mapped,
+                // Re-show the strip when the list actually changes after a dismiss.
+                todosVisible = if (mapped != uiState.sessionTodos) true else uiState.todosVisible
             )
         }
+    }
+
+    fun dismissTodos() {
+        uiState = uiState.copy(todosVisible = false)
     }
 
     private fun estimateTokens(text: String): Long = (text.length / 4).toLong()

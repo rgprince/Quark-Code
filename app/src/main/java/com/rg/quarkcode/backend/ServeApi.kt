@@ -128,6 +128,31 @@ class ServeApi(
             }
         }
 
+    suspend inline fun <reified T> put(path: String, body: JsonObject): T =
+        withContext(Dispatchers.IO) {
+            val request = builder(path)
+                .put(body.toString().toRequestBody(JSON))
+                .build()
+            http.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) fail(response.code, text)
+                json.decodeFromString<T>(text)
+            }
+        }
+
+    suspend fun putUnit(path: String, body: JsonObject) {
+        withContext(Dispatchers.IO) {
+            val request = builder(path)
+                .put(body.toString().toRequestBody(JSON))
+                .build()
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    fail(response.code, response.body?.string().orEmpty())
+                }
+            }
+        }
+    }
+
     suspend inline fun <reified T> delete(path: String): T =
         withContext(Dispatchers.IO) {
             val request = builder(path).delete().build()
@@ -137,6 +162,17 @@ class ServeApi(
                 json.decodeFromString<T>(text)
             }
         }
+
+    suspend fun deleteUnit(path: String) {
+        withContext(Dispatchers.IO) {
+            val request = builder(path).delete().build()
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    fail(response.code, response.body?.string().orEmpty())
+                }
+            }
+        }
+    }
 
     fun encodePath(value: String): String =
         value.replace("/", "%2F").replace("?", "%3F").replace("#", "%23")

@@ -23,6 +23,7 @@ import com.rg.quarkcode.backend.ThemeStore
 import com.rg.quarkcode.chat.ChatRoute
 import com.rg.quarkcode.chat.ChatScreen
 import com.rg.quarkcode.chat.ChatViewModel
+import com.rg.quarkcode.chat.ReviewScreen
 import com.rg.quarkcode.connect.ConnectScreen
 import com.rg.quarkcode.connect.ConnectViewModel
 import com.rg.quarkcode.drawer.QuarkDrawer
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 private data object ConnectRoute
 private data object SettingsRoute
 private data object SchedulesRoute
+private data object DiffRoute
 
 @Composable
 fun QuarkApp(modifier: Modifier = Modifier) {
@@ -84,23 +86,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
         drawerState = drawerState,
         drawerContent = {
             QuarkDrawer(
-                agents = listOf(chatVm.uiState.agent),
-                selectedAgent = chatVm.uiState.agent,
-                projects = listOf(chatVm.uiState.project),
-                selectedProject = chatVm.uiState.project,
                 recents = chatVm.uiState.recents,
+                hasSession = chatVm.hasSession,
                 onNewChat = {
                     closeDrawer()
                     chatVm.newSession()
-                    goChat()
-                },
-                onSelectAgent = { agent ->
-                    closeDrawer()
-                    chatVm.onAgentChange(agent)
-                    goChat()
-                },
-                onSelectProject = {
-                    closeDrawer()
                     goChat()
                 },
                 onOpenSession = { id ->
@@ -108,8 +98,9 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                     chatVm.openSession(id)
                     goChat()
                 },
-                onDeleteSession = { id ->
-                    chatVm.deleteSession(id)
+                onOpenReview = {
+                    closeDrawer()
+                    backStack.add(DiffRoute)
                 },
                 onOpenSchedules = {
                     closeDrawer()
@@ -170,6 +161,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onSlashSelect = { suggestion ->
                                     chatVm.onInputChange(suggestion.name + " ")
                                 },
+                                onDismissTodos = chatVm::dismissTodos,
                                 onOpenSettings = { backStack.add(SettingsRoute) },
                                 onMenu = { openDrawer() }
                             )
@@ -196,6 +188,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onThemeChange = settingsVm::setTheme,
                                 onProviderChange = settingsVm::onProviderChange,
                                 onRetryProviders = settingsVm::loadProviders,
+                                onOpenProviderDialog = settingsVm::openProviderDialog,
+                                onAuthKeyChange = settingsVm::onAuthKeyChange,
+                                onSaveProviderKey = settingsVm::saveProviderKey,
+                                onDisconnectProvider = settingsVm::disconnectProvider,
+                                onCloseProviderDialog = settingsVm::closeProviderDialog,
                                 autoExpandReasoning = settingsVm.uiState.autoExpandReasoning,
                                 onAutoExpandChange = { value ->
                                     settingsVm.setAutoExpand(value)
@@ -226,6 +223,17 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onSave = schedulesVm::saveEditing,
                                 onDelete = schedulesVm::delete,
                                 onToggle = schedulesVm::toggle
+                            )
+                        }
+                        is DiffRoute -> NavEntry(key) {
+                            ReviewScreen(
+                                state = chatVm.reviewState,
+                                onBack = { backStack.removeLastOrNull() },
+                                onOpen = chatVm::openReview,
+                                onRetry = chatVm::loadDiff,
+                                onTitleChange = chatVm::onReviewTitleChange,
+                                onSaveTitle = chatVm::saveReviewTitle,
+                                onSummarize = chatVm::summarizeSession
                             )
                         }
                         else -> error("Unknown route: $key")

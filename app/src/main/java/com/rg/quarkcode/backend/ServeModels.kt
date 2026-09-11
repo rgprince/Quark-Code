@@ -235,3 +235,47 @@ data class OpenCodeAgent(
     val description: String? = null,
     val mode: String? = null
 )
+
+// Provider auth shapes (AndCode IA: GET provider/auth, PUT auth/{id}, DELETE auth/{id}).
+@Serializable
+data class ProviderAuthWhen(
+    val key: String = "",
+    val op: String = "",
+    val value: String = ""
+)
+
+@Serializable
+data class ProviderAuthOption(
+    val label: String = "",
+    val value: String = ""
+)
+
+@Serializable
+data class ProviderAuthPrompt(
+    val type: String = "",
+    val key: String = "",
+    val message: String = "",
+    val placeholder: String? = null,
+    val options: List<ProviderAuthOption> = emptyList()
+)
+
+@Serializable
+data class ProviderAuthMethod(
+    val type: String = "",
+    val label: String = "",
+    val prompts: List<ProviderAuthPrompt> = emptyList()
+)
+
+// Review shapes (AndCode IA: GET session/{id}/diff, POST session/{id}/summarize,
+// PATCH session/{id} rename).
+@Serializable
+data class OpenCodeFileChange(
+    val file: String? = null,
+    val path: String? = null,
+    val patch: String? = null,
+    val additions: Double = 0.0,
+    val deletions: Double = 0.0,
+    val status: String? = null
+) {
+    val displayPath: String get() = file ?: path ?: "unknown"
+}

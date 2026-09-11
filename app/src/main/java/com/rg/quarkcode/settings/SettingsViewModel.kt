@@ -27,6 +27,15 @@ data class ProviderChoice(
     val connected: Boolean = true
 )
 
+data class ProviderAuthDialog(
+    val providerId: String = "",
+    val providerName: String = "",
+    val methodLabels: List<String> = emptyList(),
+    val apiKey: String = "",
+    val saving: Boolean = false,
+    val error: String? = null
+)
+
 data class SettingsUiState(
     val host: String = "http://localhost:4096",
     val username: String = "opencode",
@@ -38,6 +47,7 @@ data class SettingsUiState(
     val selectedProviderId: String? = null,
     val providersLoading: Boolean = false,
     val providersError: String? = null,
+    val authDialog: ProviderAuthDialog? = null,
     val autoExpandReasoning: Boolean = false,
     val detailedTools: Boolean = false,
     val serverVersion: String? = null,
@@ -56,6 +66,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val modelStore = com.rg.quarkcode.backend.ModelStore(application)
     private val chatPrefs = com.rg.quarkcode.chat.ChatPrefs(application)
     private var providerModels: Map<String, List<String>> = emptyMap()
+    private var authMethods: Map<String, List<com.rg.quarkcode.backend.ProviderAuthMethod>> = emptyMap()
 
     var uiState by mutableStateOf(SettingsUiState())
         private set
@@ -213,6 +224,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             providerModels = catalog.all.associate { p -> p.id to p.models.keys.toList() }
             val connected = catalog.connected.toSet()
             val sel = runCatching { withContext(Dispatchers.IO) { modelStore.selection.first() } }.getOrNull()
+            val methods = runCatching {
+                api.get<Map<String, List<com.rg.quarkcode.backend.ProviderAuthMethod>>>("provider/auth")
+            }.getOrNull() ?: emptyMap()
+            authMethods = methods
             uiState = uiState.copy(
                 providersLoading = false,
                 providers = catalog.all.map { p ->
@@ -228,6 +243,80 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val modelId = providerModels[providerId]?.firstOrNull()
             modelStore.selectModel(providerId, modelId)
+        }
+    }
+
+    // Provider detail dialog: API key add/remove (AndCode IA:
+    // PUT auth/{id} {type api,key}, DELETE auth/{id}).
+    fun openProviderDialog(providerId: String) {
+        val name = uiState.providers.firstOrNull { it.id == providerId }?.name ?: providerId
+        val labels = authMethods[providerId]?.map { it.label.ifBlank { it.type } } ?: emptyList()
+        uiState = uiState.copy(
+            authDialog = ProviderAuthDialog(
+                providerId = providerId,
+                providerName = name,
+                methodLabels = labels
+            )
+        )
+    }
+
+    fun closeProviderDialog() {
+        uiState = uiState.copy(authDialog = null)
+    }
+
+    fun onAuthKeyChange(value: String) {
+        uiState.authDialog?.let { dialog ->
+            uiState = uiState.copy(authDialog = dialog.copy(apiKey = value, error = null))
+        }
+    }
+
+    fun saveProviderKey() {
+        val dialog = uiState.authDialog ?: return
+        val key = dialog.apiKey.trim()
+        if (key.isEmpty()) {
+            uiState = uiState.copy(authDialog = dialog.copy(error = "Paste an API key first."))
+            return
+        }
+        viewModelScope.launch {
+            uiState = uiState.copy(authDialog = dialog.copy(saving = true, error = null))
+            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
+            val result = runCatching {
+                ServeApi(saved.host, saved.username, saved.password).putUnit(
+                    "auth/${dialog.providerId}",
+                    buildJsonObject {
+                        put("type", "api")
+                        put("key", key)
+                    }
+                )
+            }
+            result.onSuccess {
+                uiState = uiState.copy(authDialog = null)
+                loadProviders()
+            }.onFailure { err ->
+                uiState = uiState.copy(
+                    authDialog = dialog.copy(saving = false, error = err.message ?: "Could not save key")
+                )
+            }
+        }
+    }
+
+    fun disconnectProvider() {
+        val dialog = uiState.authDialog ?: return
+        viewModelScope.launch {
+            uiState = uiState.copy(authDialog = dialog.copy(saving = true, error = null))
+            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
+            val result = runCatching {
+                ServeApi(saved.host, saved.username, saved.password)
+                    .deleteUnit("auth/${dialog.providerId}")
+            }
+            result.onSuccess {
+                uiState = uiState.copy(authDialog = null)
+                loadProviders()
+            }.onFailure { err ->
+                uiState = uiState.copy(
+                    authDialog = dialog.copy(saving = false, error = err.message ?: "Could not disconnect")
+                )
+            }
         }
     }
 

@@ -10,14 +10,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
@@ -73,9 +77,10 @@ fun OrbitComposer(
     onVariantChange: (String?) -> Unit,
     onSlashSelect: (SlashSuggestion) -> Unit
 ) {
+    // Provider name stays out of the box: short model label only.
+    val shortModel = model.substringAfter(" / ", model)
     Column(modifier = modifier.fillMaxWidth()) {
-        if (input.startsWith("/") && slashSuggestions.isNotEmpty()) {
-            Card(
+        if (input.startsWith("/") && slashSuggestions.isNotEmpty()) {            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 4.dp),
@@ -84,8 +89,11 @@ fun OrbitComposer(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 )
             ) {
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    slashSuggestions.take(6).forEach { suggestion ->
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 280.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(slashSuggestions, key = { it.name }) { suggestion ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -115,54 +123,62 @@ fun OrbitComposer(
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             tonalElevation = 2.dp,
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Column(modifier = Modifier.padding(8.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
                 TextField(
                     value = input,
                     onValueChange = onInputChange,
-                    placeholder = { Text("Message…  (/ for commands)") },
+                    placeholder = { Text("Message…", maxLines = 1) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent
                     ),
-                    maxLines = 5
+                    maxLines = 6
                 )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp),
+                        .padding(top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     AssistChip(
                         onClick = onModelClick,
                         label = {
                             Text(
-                                text = model,
+                                text = shortModel,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         },
                         trailingIcon = {
-                            Icon(Icons.Filled.ExpandMore, contentDescription = null)
+                            Icon(
+                                Icons.Filled.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
                         },
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     if (sending) {
-                        FilledIconButton(onClick = onAbort) {
+                        FilledIconButton(
+                            onClick = onAbort,
+                            modifier = Modifier.size(44.dp)
+                        ) {
                             Icon(Icons.Filled.Stop, contentDescription = "Stop")
                         }
                     } else {
                         FilledIconButton(
                             onClick = onSend,
-                            enabled = input.isNotBlank()
+                            enabled = input.isNotBlank(),
+                            modifier = Modifier.size(44.dp)
                         ) {
                             Icon(Icons.Filled.Send, contentDescription = "Send")
                         }

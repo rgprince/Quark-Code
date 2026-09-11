@@ -53,6 +53,16 @@ Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 - [x] Glow light: pulsing primary bar below editor while sending
 - [x] Settings extras: Chat toggles (auto-expand reasoning, detailed tools, shared `ChatPrefs` store), server version, copy-diagnostics
 
+## V4.2 batch — slash-all, thinking lag, todos, drawer, provider keys, composer, review
+- [x] Slash popup scrolls full list (`heightIn 280.dp`, no take(6))
+- [x] Thinking lag fixed: tail clears on first streamed content + on transcript answer
+- [x] Ring label capped at 100%
+- [x] Session todos collapsible + dismissible (`todosVisible`, re-shows on change)
+- [x] Drawer slimmed: recents open-only (delete removed), Review/Schedules/Settings
+- [x] Provider tap → auth dialog: `GET provider/auth` methods shown, `PUT auth/{id}` save key, `DELETE auth/{id}` disconnect
+- [x] Composer: short model label (provider hidden), tighter rows, 44dp send
+- [x] Review screen (drawer): `GET session/{id}/diff` file cards + `PATCH` rename + `POST summarize` (no share endpoint on server)
+
 ## Later (V4+)
 - Changes/review tab, fork/revert, slash autocomplete, terminal + file browser
 - R8 release shrink (debug APK 65M), F-Droid flavor
