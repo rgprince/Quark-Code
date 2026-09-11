@@ -492,7 +492,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(
                 recents = sessions
                     .filter { it.time.archived == null }
-                    .take(20)
+                    .sortedByDescending { it.time.updated ?: it.time.created }
+                    .take(100)
                     .map { RecentSession(it.id, it.title.ifEmpty { it.id.take(8) }) }
             )
         }
@@ -1316,7 +1317,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val scoped = sessions
                 .filter { it.time.archived == null }
                 .sortedByDescending { it.time.created }
-                .take(30)
             val now = System.currentTimeMillis()
             val weekCut = now - 7L * 24 * 60 * 60 * 1000
             val monthCut = now - 30L * 24 * 60 * 60 * 1000

@@ -98,7 +98,14 @@ fun QuarkDrawer(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
             )
-            if (recents.isNotEmpty()) {
+            if (recents.isEmpty()) {
+                Text(
+                    text = "No chats yet — your sessions appear here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                )
+            } else {
                 DrawerHeader(title = "Chats")
                 recents.forEach { recent ->
                     key(recent.id) {

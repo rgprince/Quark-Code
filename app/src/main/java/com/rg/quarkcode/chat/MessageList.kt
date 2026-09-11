@@ -22,11 +22,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
@@ -55,14 +55,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
@@ -80,6 +76,7 @@ fun MessageList(
     thoughtExpanded: Boolean = false,
     onToggleThought: () -> Unit = {},
     textScale: Float = 1f,
+    streamingIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     detailedTools: Boolean = false,
@@ -114,22 +111,43 @@ fun MessageList(
             }
         }
     }
+    val lastUserIndex = remember(timeline) {
+        timeline.indexOfLast { it is TimelineEntry.UserMessage }
+    }
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(timeline, key = { it.id }, contentType = { it.javaClass.simpleName }) { entry ->
+        itemsIndexed(
+            timeline,
+            key = { _, entry -> entry.id },
+            contentType = { _, entry -> entry.javaClass.simpleName }
+        ) { index, entry ->
             when (entry) {
-                is TimelineEntry.UserMessage -> UserBubble(
-                    message = entry.message,
-                    textScale = textScale,
-                    modifier = Modifier.animateItem()
-                )
+                is TimelineEntry.UserMessage -> {
+                    UserBubble(
+                        message = entry.message,
+                        textScale = textScale,
+                        modifier = Modifier.animateItem()
+                    )
+                    // Think-then-reply order: the thought line belongs right
+                    // after the prompt it answered, not at transcript end.
+                    if (index == lastUserIndex && !thinking && thoughtMs != null) {
+                        ThoughtDoneRow(
+                            ms = thoughtMs,
+                            text = thoughtText,
+                            expanded = thoughtExpanded,
+                            onToggle = onToggleThought,
+                            modifier = Modifier.animateItem()
+                        )
+                    }
+                }
                 is TimelineEntry.Body -> AssistantBody(
                     text = hideToolCallEcho(entry.part.text),
                     textScale = textScale,
+                    streaming = streamingIds.contains(entry.messageId),
                     modifier = Modifier.animateItem()
                 )
                 is TimelineEntry.Image -> AsyncImage(
@@ -180,6 +198,11 @@ fun MessageList(
                     }
                 }
                 is TimelineEntry.Activity -> {
+                    // Reasoning-only leftovers (pre-thought-line era) render
+                    // nothing: an "Activity" box with no tools is pure noise.
+                    if (entry.parts.none { it is ChatPart.Tool || it is ChatPart.Patch }) {
+                        return@itemsIndexed
+                    }
                     val open = expandedParts.contains(entry.id)
                     val running = entry.parts.filterIsInstance<ChatPart.Tool>().any {
                         it.status == ToolStatus.RUNNING || it.status == ToolStatus.PENDING
@@ -263,20 +286,9 @@ fun MessageList(
         }
         // Live status lives at the transcript tail, never above the composer.
         // Suppressed while a running activity row already shows progress.
-        // Once thinking ends, a tiny "Thought for 2.3s" row takes its place.
         if (thinking && !hasRunningActivity) {
             item(key = "thinking-tail") {
                 ThinkingTail(modifier = Modifier.animateItem())
-            }
-        } else if (!thinking && thoughtMs != null) {
-            item(key = "thought-done") {
-                ThoughtDoneRow(
-                    ms = thoughtMs,
-                    text = thoughtText,
-                    expanded = thoughtExpanded,
-                    onToggle = onToggleThought,
-                    modifier = Modifier.animateItem()
-                )
             }
         }
         // Permissions + questions render after timeline, like AndCode.
@@ -461,174 +473,19 @@ private fun UserBubble(
 private fun AssistantBody(
     text: String,
     textScale: Float = 1f,
+    streaming: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (text.isBlank()) return
-    val blocks = remember(text) { parseMarkdownLite(text) }
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        SelectionContainer {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                blocks.forEach { block ->
-                    when (block) {
-                        is LiteBlock.Prose -> Text(
-                            text = renderInline(block.text),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = MaterialTheme.typography.bodyMedium.fontSize * textScale
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        is LiteBlock.Code -> CodeBlockCard(
-                            lang = block.lang,
-                            code = block.code,
-                            textScale = textScale
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private sealed interface LiteBlock {
-    data class Prose(val text: String, val style: androidx.compose.ui.text.TextStyle) : LiteBlock
-    data class Code(val lang: String, val code: String) : LiteBlock
+    RichTextDocument(
+        text = text,
+        textScale = textScale,
+        streaming = streaming,
+        modifier = modifier
+    )
 }
 
 @Composable
-private fun androidx.compose.ui.text.TextStyle.withDefault(): androidx.compose.ui.text.TextStyle = this
-
-private fun parseMarkdownLite(text: String): List<LiteBlock> {
-    val out = mutableListOf<LiteBlock>()
-    val lines = text.split("\n")
-    val prose = StringBuilder()
-    var i = 0
-    fun flushProse() {
-        if (prose.isNotEmpty()) {
-            out.add(LiteBlock.Prose(prose.toString().trim(), androidx.compose.ui.text.TextStyle.Default))
-            prose.clear()
-        }
-    }
-    while (i < lines.size) {
-        val line = lines[i]
-        if (line.trimStart().startsWith("```")) {
-            flushProse()
-            val lang = line.trim().removePrefix("```").trim()
-            val code = StringBuilder()
-            i++
-            while (i < lines.size && !lines[i].trimStart().startsWith("```")) {
-                code.appendLine(lines[i])
-                i++
-            }
-            out.add(LiteBlock.Code(lang.ifBlank { "code" }, code.toString().trimEnd()))
-        } else {
-            prose.appendLine(line)
-        }
-        i++
-    }
-    flushProse()
-    return out.ifEmpty { listOf(LiteBlock.Prose(text, androidx.compose.ui.text.TextStyle.Default)) }
-}
-
-@Composable
-private fun renderInline(text: String): AnnotatedString {
-    // Handles **bold** and `inline code`; headings render via block prefix.
-    return buildAnnotatedString {
-        var t = text
-        // Strip heading markers for display.
-        t.lines().forEachIndexed { idx, line ->
-            if (idx > 0) append("\n")
-            val stripped = when {
-                line.startsWith("### ") -> line.removePrefix("### ")
-                line.startsWith("## ") -> line.removePrefix("## ")
-                line.startsWith("# ") -> line.removePrefix("# ")
-                line.startsWith("> ") -> line.removePrefix("> ")
-                else -> line
-            }
-            var rest = stripped
-            while (rest.isNotEmpty()) {
-                val bold = Regex("""\*\*(.+?)\*\*""").find(rest)
-                val code = Regex("""`(.+?)`""").find(rest)
-                val next = listOfNotNull(
-                    bold?.let { it.range.first to it },
-                    code?.let { it.range.first to it }
-                ).minByOrNull { it.first }?.second
-                if (next == null) {
-                    append(rest)
-                    break
-                }
-                append(rest.substring(0, next.range.first))
-                if (next.value.startsWith("**")) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append(next.groupValues[1])
-                    }
-                } else {
-                    withStyle(
-                        SpanStyle(
-                            fontFamily = FontFamily.Monospace,
-                            background = androidx.compose.ui.graphics.Color.Transparent
-                        )
-                    ) {
-                        append(next.groupValues[1])
-                    }
-                }
-                rest = rest.substring(next.range.last + 1)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CodeBlockCard(
-    lang: String,
-    code: String,
-    textScale: Float = 1f,
-    modifier: Modifier = Modifier
-) {
-    val clipboard = LocalClipboardManager.current
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        )
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = lang,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = { clipboard.setText(AnnotatedString(code)) },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.ContentCopy,
-                        contentDescription = "Copy code",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-            Text(
-                text = code,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = MaterialTheme.typography.bodySmall.fontSize * textScale
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
 @Composable
 private fun PatchInlineCard(files: List<String>, modifier: Modifier = Modifier) {
     if (files.isEmpty()) return

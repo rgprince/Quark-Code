@@ -175,6 +175,15 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
   `model` tag first, else majority vote across its answers (no pro-rata math;
   totals match the chat ring exactly)
 
+## V5.8 scope — think-then-reply order + rich text + uncapped stats
+- [x] Thought line moved to right after the prompt it answered (think, then
+  reply); phantom "Activity" boxes with no tools no longer render
+- [x] RichText engine (own code, studied kai9000's block/inline pattern):
+  headings, bullets, numbered lists, quotes, tables, rules, code + copy,
+  bold/italic/strike/links; streaming-safe; blinking caret while streaming
+- [x] Recents raised to 100 sorted by recency + drawer empty hint; usage scan
+  counts every non-archived chat (no 30-cap)
+
 ## V5.3 scope — editor rework + crash + text size + audit
 - [x] Crash on typing `/` fixed: slash list deduped by name (backend often
   redefines /help//new/…) + unique popup keys

@@ -137,6 +137,9 @@ fun ChatScreen(
         state.messages.flatMap { it.parts }.filterIsInstance<ChatPart.Reasoning>()
             .lastOrNull { it.text.isNotBlank() }?.text?.takeLast(600).orEmpty()
     }
+    val streamingIds = remember(state.messages) {
+        state.messages.filter { it.isStreaming }.map { it.id }.toSet()
+    }
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -182,6 +185,7 @@ fun ChatScreen(
                     thoughtExpanded = thoughtExpanded,
                     onToggleThought = { thoughtExpanded = !thoughtExpanded },
                     textScale = state.textScale,
+                    streamingIds = streamingIds,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     modifier = Modifier.weight(1f),
                     onTogglePart = onTogglePart,

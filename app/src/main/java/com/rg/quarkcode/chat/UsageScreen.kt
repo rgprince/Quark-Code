@@ -111,7 +111,7 @@ fun UsageScreen(
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Totals for week, month and all time — broken down by model, with server-reported cost. Free models show $0.00.",
+                            text = "Totals for week, month and all time — broken down by model, with server-reported cost. Free models show $0.00. Scans every chat on this server.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -269,7 +269,7 @@ fun UsageScreen(
                     Text(
                         text = "Cost is server-reported per session (free models count $0.00). " +
                             "Each session is tagged with its own model when the server reports one, " +
-                            "otherwise by majority vote of its answers. Up to 30 recent sessions scanned.",
+                            "otherwise by majority vote of its answers. Every non-archived chat counted.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -291,7 +291,7 @@ fun UsageScreen(
             onDismissRequest = onDismissConfirm,
             title = { Text("Scan usage?") },
             text = {
-                Text("Reads up to 30 recent sessions from this server to add up tokens, models and cost. Nothing is modified.")
+                Text("Reads every chat on this server to add up tokens, models and cost. Nothing is modified. Cancel anytime.")
             },
             confirmButton = {
                 Button(onClick = onConfirmScan) {
