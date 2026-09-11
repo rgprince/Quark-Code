@@ -191,6 +191,7 @@ fun ChatScreen(
                     messages = state.messages,
                     expandedParts = state.expandedParts,
                     thinking = state.thinking,
+                    busy = busy,
                     thinkingSecs = thinkingSecs,
                     speakingId = state.speakingId,
                     thoughtMs = lastThoughtMs,
@@ -350,13 +351,16 @@ private fun QuarkEmptyState(
 
 private fun ringFraction(stats: ContextStats): Float {
     if (stats.limit <= 0L) return 0f
-    return (stats.used.toFloat() / stats.limit.toFloat()).coerceIn(0f, 1f)
+    val raw = (stats.used.toFloat() / stats.limit.toFloat()).coerceIn(0f, 1f)
+    // Never render a flat 0% when tokens are actually used — that reads as dead.
+    return if (stats.used > 0L) raw.coerceAtLeast(0.01f) else raw
 }
 
 private fun ringLabel(stats: ContextStats): String {
     if (stats.limit <= 0L) return "—"
     val pct = ((stats.used.coerceAtLeast(0L) * 100) / stats.limit).coerceAtMost(100L)
-    return "$pct%"
+    val shown = if (stats.used > 0L) pct.coerceAtLeast(1L) else pct
+    return "$shown%"
 }
 
 private fun meterLabel(stats: ContextStats): String {

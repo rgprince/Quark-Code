@@ -91,6 +91,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
         drawerContent = {
             QuarkDrawer(
                 recents = chatVm.uiState.recents,
+                recentsError = chatVm.uiState.recentsError,
                 hasSession = chatVm.hasSession,
                 onNewChat = {
                     closeDrawer()

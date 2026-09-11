@@ -298,8 +298,14 @@ fun OrbitComposer(
                             }
                         }
                         Text(
-                            text = meterLabel.substringBefore(" / ") +
-                                "(${(meterFraction * 100).toInt()}%)",
+                            // Full context readout: "12.4k / 200k · 6%".
+                            // The old `86(0%)` form hid the limit and floored
+                            // small usage to 0%, reading as a dead meter.
+                            text = run {
+                                val pct = (meterFraction * 100).toInt()
+                                val shown = if (meterFraction > 0f) pct.coerceAtLeast(1) else 0
+                                "$meterLabel · $shown%"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -308,6 +314,13 @@ fun OrbitComposer(
                             }
                         )
                         Spacer(modifier = Modifier.weight(1f))
+                        if (variants.isNotEmpty()) {
+                            VariantPill(
+                                variants = variants,
+                                selected = selectedVariant,
+                                onSelect = onVariantChange
+                            )
+                        }
                         if (queuedCount > 0) {
                             Badge(
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -420,6 +433,63 @@ private fun ModeStrip(
                 onClick = { onSelect(entry); expanded = false },
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             )
+        }
+    }
+}
+
+// Variant pill (V5.5 regression restore): one-tap thinking-effort switch in
+// the composer action row, next to the model pill. The ModelSheet section
+// stays as a harmless duplicate.
+@Composable
+private fun VariantPill(
+    variants: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        Surface(
+            shape = RoundedCornerShape(100.dp),
+            color = if (selected.isNullOrBlank()) {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer
+            },
+            modifier = Modifier
+                .heightIn(min = 40.dp)
+                .clickable(onClick = { expanded = true }, role = Role.Button)
+                .semantics {
+                    contentDescription = "Thinking effort ${selected ?: "auto"}, open variant menu"
+                }
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = selected ?: "auto",
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 90.dp)
+                )
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("auto") },
+                onClick = { onSelect(null); expanded = false },
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            )
+            variants.forEach { entry ->
+                DropdownMenuItem(
+                    text = { Text(entry) },
+                    onClick = { onSelect(entry); expanded = false },
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                )
+            }
         }
     }
 }

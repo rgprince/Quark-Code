@@ -489,16 +489,34 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadRecents() {
         viewModelScope.launch {
-            val sessions = runCatching {
+            val result = runCatching {
                 api?.getList<com.rg.quarkcode.backend.SessionInfo>("session")
-            }.getOrNull() ?: return@launch
+            }
+            val sessions = result.getOrNull()
+            if (sessions == null) {
+                // Never fail silently to "No chats yet": surface the error so
+                // the drawer can offer retry instead of looking empty.
+                val msg = result.exceptionOrNull()?.message?.take(160)
+                uiState = uiState.copy(
+                    recentsError = msg ?: "Couldn't reach the server"
+                )
+                return@launch
+            }
             sessions.forEach { lastSeenIds.add(it.id) }
+            val visible = sessions
+                .filter { !it.time.isArchived }
+                .sortedByDescending { it.time.updated ?: it.time.created }
+                .take(100)
+                .map { RecentSession(it.id, it.title.ifEmpty { it.id.take(8) }) }
             uiState = uiState.copy(
-                recents = sessions
-                    .filter { it.time.archived == null || it.time.archived == 0L }
-                    .sortedByDescending { it.time.updated ?: it.time.created }
-                    .take(100)
-                    .map { RecentSession(it.id, it.title.ifEmpty { it.id.take(8) }) }
+                recents = visible,
+                // Keep a hint when the server returned sessions but all are
+                // archived (explains an "empty" drawer without lying).
+                recentsError = if (visible.isEmpty() && sessions.isNotEmpty()) {
+                    "${sessions.size} archived — nothing active"
+                } else {
+                    null
+                }
             )
             // Keep the top-bar chat name in sync when the open session renames.
             val openId = sessionId
@@ -708,16 +726,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 runCatching { client.messages(id) }.onSuccess { serverMessages ->
                     if (!stillActive()) return@onSuccess
                     val mapped = serverMessages.mapNotNull { it.toUiMessage() }
+                    // NOTE: thinking is cleared by streamed content / idle /
+                    // turnFinished only. The old recompute
+                    // (`none { has Text }`) flipped thinking off on the first
+                    // poll whenever ANY historical text existed, creating the
+                    // dead gap with no tail and no activity row.
                     val merged = mergeReloadedMessages(mapped, uiState.messages, retain)
                     if (merged.isNotEmpty() && merged != uiState.messages) {
-                        uiState = uiState.copy(
-                            messages = merged,
-                            thinking = merged.none {
-                                !it.isUser && it.parts.any { part ->
-                                    part is ChatPart.Text && part.text.isNotBlank()
-                                }
-                            } && uiState.sending
-                        )
+                        uiState = uiState.copy(messages = merged)
                     }
                     mapped.forEach { lastSeenIds.add(it.id) }
                     if (turnFinished(serverMessages, idsBeforeSend)) {
@@ -781,8 +797,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteSession(id: String) {
         viewModelScope.launch {
+            // DELETE returns an empty body — use deleteUnit, never decode it.
             runCatching {
-                api?.delete<Boolean>("session/${api!!.encodePath(id)}")
+                api?.deleteUnit("session/${api!!.encodePath(id)}")
             }
             if (sessionId == id) {
                 newSession()
@@ -860,7 +877,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         reviewState = reviewState.copy(summarizing = true, error = null)
         viewModelScope.launch {
             runCatching {
-                api?.post<Boolean>(
+                api?.postUnit(
                     "session/${api!!.encodePath(id)}/summarize",
                     buildJsonObject {
                         put("providerID", ref?.providerId ?: "")
@@ -906,16 +923,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     else -> ChatPart.Text(event.partId, event.delta)
                 }
                 upsertStreamedPart(event.messageId, streamedParts[event.partId]!!)
-                if (event.field == "text") {
-                    // Live token climb: server truth lands at turn end via
-                    // refreshCost; until then grow by the streamed delta so
-                    // the meter is never stuck on the typed estimate.
-                    val bump = (event.delta.length / 4).coerceAtLeast(1).toLong()
-                    uiState = uiState.copy(
-                        thinking = false,
-                        stats = uiState.stats.copy(used = uiState.stats.used + bump)
-                    )
-                }
+                // Live token climb: server truth lands via refreshCost; until
+                // then grow by every streamed delta (text AND reasoning) so
+                // the meter never sits stuck on the typed estimate.
+                val bump = (event.delta.length / 4).coerceAtLeast(1).toLong()
+                uiState = uiState.copy(
+                    thinking = if (event.field == "text") false else uiState.thinking,
+                    stats = uiState.stats.copy(used = uiState.stats.used + bump)
+                )
             }
             is ServerEvent.PartUpdated -> {
                 val part = event.part
@@ -1255,8 +1270,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val apiResponse = if (remember && response == "once") "always" else response
         viewModelScope.launch {
             runCatching {
+                // Session id is the open session, NOT the permission id:
+                // the old path encoded permissionId twice and Allow never hit.
                 api?.postUnit(
-                    "session/${api!!.encodePath(permissionId)}/permissions/$permissionId",
+                    "session/${api!!.encodePath(id)}/permissions/$permissionId",
                     buildJsonObject { put("response", apiResponse) }
                 )
             }
@@ -1341,7 +1358,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             val scoped = sessions
-                .filter { it.time.archived == null }
+                .filter { !it.time.isArchived }
                 .sortedByDescending { it.time.created }
             val now = System.currentTimeMillis()
             val weekCut = now - 7L * 24 * 60 * 60 * 1000
@@ -1474,12 +1491,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val info = runCatching { api?.get<SessionInfo>("session/${api!!.encodePath(id)}") }
                 .getOrNull() ?: return@launch
             val tokens = info.tokens
+            val serverUsed = tokens?.contextUsed ?: uiState.stats.used
             uiState = uiState.copy(
                 stats = uiState.stats.copy(
                     cost = info.cost,
-                    used = tokens?.contextUsed ?: uiState.stats.used,
+                    // Never let the meter run backwards when server truth lags
+                    // behind streamed deltas.
+                    used = maxOf(serverUsed, uiState.stats.used),
                     input = tokens?.input ?: uiState.stats.input,
-                    output = tokens?.output ?: uiState.stats.output
+                    output = (tokens?.let { it.output + it.reasoning } ?: uiState.stats.output)
                 )
             )
         }

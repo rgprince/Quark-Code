@@ -1,10 +1,72 @@
 package com.rg.quarkcode.backend
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.longOrNull
+
+/** Lenient long: accepts number, numeric string, boolean (true=1/false=0), null. */
+object LenientLongOrNull : KSerializer<Long?> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("LenientLongOrNull", PrimitiveKind.LONG)
+    override fun deserialize(decoder: Decoder): Long? {
+        if (decoder is JsonDecoder) {
+            val el = decoder.decodeJsonElement()
+            if (el is JsonPrimitive) {
+                if (el.isString) {
+                    val s = el.content.trim()
+                    if (s.isEmpty() || s.equals("null", true)) return null
+                    s.toLongOrNull()?.let { return it }
+                    if (s.equals("true", true)) return 1L
+                    if (s.equals("false", true)) return 0L
+                    return null
+                }
+                el.longOrNull?.let { return it }
+                el.booleanOrNull?.let { return if (it) 1L else 0L }
+                return null
+            }
+            return null
+        }
+        return runCatching { decoder.decodeLong() }.getOrNull()
+    }
+    override fun serialize(encoder: Encoder, value: Long?) {
+        if (value == null) encoder.encodeNull() else encoder.encodeLong(value)
+    }
+}
+
+object LenientLong : KSerializer<Long> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("LenientLong", PrimitiveKind.LONG)
+    override fun deserialize(decoder: Decoder): Long =
+        LenientLongOrNull.deserialize(decoder) ?: 0L
+    override fun serialize(encoder: Encoder, value: Long) = encoder.encodeLong(value)
+}
+
+/**
+ * Archived is the drawer-empty root cause: some servers send `archived` as a
+ * boolean or omit it, while the old `Long?` model threw on booleans and
+ * `getList` failed silently to an empty list. Accept number/boolean/string.
+ * true -> 1 (archived), false/0/null -> not archived.
+ */
+object ArchivedSerializer : KSerializer<Long?> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("Archived", PrimitiveKind.STRING)
+    override fun deserialize(decoder: Decoder): Long? =
+        LenientLongOrNull.deserialize(decoder)?.takeIf { it != 0L }
+    override fun serialize(encoder: Encoder, value: Long?) {
+        if (value == null) encoder.encodeNull() else encoder.encodeLong(value)
+    }
+}
 
 @Serializable
 data class Health(
@@ -15,27 +77,33 @@ data class Health(
 // Session / message / part shapes ported from AndCode's OpenCodeApiModels.
 @Serializable
 data class SessionTime(
-    val created: Long = 0L,
-    val updated: Long? = null,
-    val completed: Long? = null,
-    val archived: Long? = null
-)
+    @Serializable(with = LenientLong::class) val created: Long = 0L,
+    @Serializable(with = LenientLongOrNull::class) val updated: Long? = null,
+    @Serializable(with = LenientLongOrNull::class) val completed: Long? = null,
+    @Serializable(with = ArchivedSerializer::class) val archived: Long? = null
+) {
+    /** Normalised: null or 0 = active, anything else = archived. */
+    val isArchived: Boolean get() = archived != null && archived != 0L
+}
 
 @Serializable
 data class SessionTokens(
-    val input: Long = 0L,
-    val output: Long = 0L,
-    val reasoning: Long = 0L,
+    @Serializable(with = LenientLong::class) val input: Long = 0L,
+    @Serializable(with = LenientLong::class) val output: Long = 0L,
+    @Serializable(with = LenientLong::class) val reasoning: Long = 0L,
     val cache: CacheTokens? = null
 ) {
+    // Ring accounting: input + cache reads + generated tokens. The old
+    // `input + cache` missed output/reasoning so refreshCost shrank `used`
+    // mid-turn and the meter looked stuck.
     val contextUsed: Long
-        get() = input + (cache?.read ?: 0L)
+        get() = input + (cache?.read ?: 0L) + output + reasoning
 }
 
 @Serializable
 data class CacheTokens(
-    val read: Long = 0L,
-    val write: Long = 0L
+    @Serializable(with = LenientLong::class) val read: Long = 0L,
+    @Serializable(with = LenientLong::class) val write: Long = 0L
 )
 
 @Serializable

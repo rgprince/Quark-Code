@@ -40,6 +40,7 @@ import com.rg.quarkcode.chat.RecentSession
 @Composable
 fun QuarkDrawer(
     recents: List<RecentSession>,
+    recentsError: String? = null,
     hasSession: Boolean,
     modifier: Modifier = Modifier,
     onNewChat: () -> Unit,
@@ -101,13 +102,22 @@ fun QuarkDrawer(
                     .padding(horizontal = 16.dp)
             )
             if (recents.isEmpty()) {
-                TextButton(onClick = onRefreshRecents) {
+                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
                     Text(
-                        text = "No chats yet — tap to reload.",
+                        text = recentsError ?: "No chats yet.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        color = if (recentsError != null) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
+                    TextButton(onClick = onRefreshRecents) {
+                        Text(
+                            text = "Tap to reload",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
                 }
             } else {
                 DrawerHeader(title = "Chats")

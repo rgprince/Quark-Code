@@ -70,6 +70,7 @@ fun MessageList(
     messages: List<ChatMessage>,
     expandedParts: Set<String>,
     thinking: Boolean,
+    busy: Boolean = false,
     thinkingSecs: Int = 0,
     speakingId: String?,
     thoughtMs: Long? = null,
@@ -134,8 +135,10 @@ fun MessageList(
                         modifier = Modifier.animateItem()
                     )
                     // Think-then-reply order: the thought line belongs right
-                    // after the prompt it answered, not at transcript end.
-                    if (index == lastUserIndex && !thinking && thoughtMs != null) {
+                    // after the prompt it answered. Shown regardless of the
+                    // live `thinking` flag so it survives flicker and newer
+                    // turns (no more vanishes when a follow-up is queued).
+                    if (index == lastUserIndex && thoughtMs != null) {
                         ThoughtDoneRow(
                             ms = thoughtMs,
                             text = thoughtText,
@@ -191,7 +194,10 @@ fun MessageList(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         FilledTonalButton(
-                            onClick = { onRetry(entry.part.id) },
+                            // Retry needs the MESSAGE id (VM looks up the last
+                            // user text before it) — the old code passed the
+                            // part id, so retry silently did nothing.
+                            onClick = { onRetry(entry.messageId) },
                             modifier = Modifier.height(48.dp)
                         ) {
                             Text("Retry")
@@ -286,8 +292,11 @@ fun MessageList(
             }
         }
         // Live status lives at the transcript tail, never above the composer.
-        // Suppressed while a running activity row already shows progress.
-        if (thinking && !hasRunningActivity) {
+        // Derived from busy (like the stop button), not just the `thinking`
+        // flag, so a long pre-tool reasoning phase with no activity row yet
+        // still shows "thinking… Ns" instead of a dead gap. Suppressed only
+        // while a running activity row already shows progress.
+        if ((thinking || busy) && !hasRunningActivity) {
             item(key = "thinking-tail") {
                 ThinkingTail(
                     seconds = thinkingSecs,

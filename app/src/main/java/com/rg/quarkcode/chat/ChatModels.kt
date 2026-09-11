@@ -121,6 +121,7 @@ data class ChatUiState(
     val catalogLoading: Boolean = false,
     val catalogError: String? = null,
     val recents: List<RecentSession> = emptyList(),
+    val recentsError: String? = null,
     val sessionTodos: List<TodoItem> = emptyList(),
     val todosVisible: Boolean = true,
     val connected: Boolean = false,

@@ -12,8 +12,20 @@ android {
         applicationId = "com.rg.quarkcode"
         minSdk = 28
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
+    }
+
+    signingConfigs {
+        // Stable dummy key checked into the repo so every CI build shares
+        // one signature: `adb install -r` updates instead of forcing
+        // uninstall/reinstall. Replace with a real keystore before Play.
+        create("quarkDemo") {
+            storeFile = rootProject.file("keystore/dummy.jks")
+            storePassword = "quarkdemo"
+            keyAlias = "quarkdemo"
+            keyPassword = "quarkdemo"
+        }
     }
 
     buildTypes {
@@ -24,8 +36,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Debug key so the release APK installs without a keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("quarkDemo")
         }
     }
 

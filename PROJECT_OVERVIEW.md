@@ -196,6 +196,15 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V6 scope — OPEN_BUGS fix batch + update-ready R8 (single push)
+- [x] Variant pill restored in composer (`OrbitComposer.VariantPill`: auto + list, next to model pill; sheet section kept)
+- [x] Drawer truth: tolerant `SessionTime` (archived bool/num/string), `recentsError` surfaced in drawer with retry (no more silent empty)
+- [x] Live meter: `contextUsed` = input+cache+output+reasoning, deltas bump on text AND reasoning, `refreshCost` never runs backwards, ring min 1%, composer shows `used / limit · pct`
+- [x] Thinking gap: poll no longer clears `thinking` on historical text; tail derives from `thinking || busy`, suppressed only by running activity
+- [x] Thought persistence: thought row stays across turns (no `!thinking` hide)
+- [x] Audit extras: permission URL used session id (Allow/Deny was 404), `deleteSession`/`summarize` use Unit (no Boolean decode crash), usage scan accepts archived=0, retry passes message id (was part id → no-op)
+- [x] Update-ready R8: stable `keystore/dummy.jks` (quarkdemo/dummy) signed release, v0.3.0 (code 3) — `adb install -r` updates, no uninstall
+
 ## V5.3 scope — editor rework + crash + text size + audit
 - [x] Crash on typing `/` fixed: slash list deduped by name (backend often
   redefines /help//new/…) + unique popup keys

@@ -18,7 +18,7 @@ sealed interface TimelineEntry {
         override val id: String = "image:${part.id}"
     }
 
-    data class Error(val part: ChatPart.Error) : TimelineEntry {
+    data class Error(val messageId: String, val part: ChatPart.Error) : TimelineEntry {
         override val id: String = "error:${part.id}"
     }
 
@@ -75,7 +75,7 @@ fun groupConversationTimeline(messages: List<ChatMessage>): List<TimelineEntry> 
                 }
                 is ChatPart.Error -> {
                     flushActivity()
-                    entries.add(TimelineEntry.Error(part))
+                    entries.add(TimelineEntry.Error(message.id, part))
                 }
                 is ChatPart.QuestionOption -> {
                     // Questions render in the question section; don't break activity grouping.
