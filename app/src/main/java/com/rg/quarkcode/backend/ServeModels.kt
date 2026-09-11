@@ -163,8 +163,8 @@ object ModelRefSerializer : KSerializer<ModelRef> {
         if (encoder is kotlinx.serialization.json.JsonEncoder) {
             encoder.encodeJsonElement(
                 kotlinx.serialization.json.buildJsonObject {
-                    put("providerID", value.providerId)
-                    put("modelID", value.modelId)
+                    put("providerID", JsonPrimitive(value.providerId))
+                    put("modelID", JsonPrimitive(value.modelId))
                 }
             )
         } else {
