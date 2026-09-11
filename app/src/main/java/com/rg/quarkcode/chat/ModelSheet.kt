@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,12 +52,14 @@ fun ModelSheet(
     providerName: String,
     favorites: Set<String>,
     recents: List<String>,
+    hiddenModels: List<CatalogModel>,
     catalogLoading: Boolean,
     catalogError: String?,
     modifier: Modifier = Modifier,
     onRuntimeChange: (Runtime) -> Unit,
     onModelChange: (String) -> Unit,
     onFavoriteToggle: (String) -> Unit,
+    onHiddenToggle: (String) -> Unit,
     onRetryCatalog: () -> Unit,
     onOpenProviderSettings: () -> Unit,
     onDismiss: () -> Unit
@@ -223,8 +227,27 @@ fun ModelSheet(
                             model = model,
                             selected = selectedId == model.id,
                             favorite = favorites.contains(model.id),
+                            showHide = showAll,
                             onSelect = { onModelChange(model.id) },
-                            onFavoriteToggle = { onFavoriteToggle(model.id) }
+                            onFavoriteToggle = { onFavoriteToggle(model.id) },
+                            onHiddenToggle = { onHiddenToggle(model.id) }
+                        )
+                    }
+                }
+                if (showAll && hiddenModels.isNotEmpty()) {
+                    item(key = "hidden-header") {
+                        SectionHeader(title = "Hidden")
+                    }
+                    items(hiddenModels, key = { "hidden-${it.id}" }) { model ->
+                        ModelRow(
+                            model = model,
+                            selected = false,
+                            favorite = false,
+                            hidden = true,
+                            showHide = true,
+                            onSelect = { },
+                            onFavoriteToggle = { },
+                            onHiddenToggle = { onHiddenToggle(model.id) }
                         )
                     }
                 }
@@ -253,8 +276,11 @@ private fun ModelRow(
     selected: Boolean,
     favorite: Boolean,
     modifier: Modifier = Modifier,
+    hidden: Boolean = false,
+    showHide: Boolean = false,
     onSelect: () -> Unit,
-    onFavoriteToggle: () -> Unit
+    onFavoriteToggle: () -> Unit,
+    onHiddenToggle: () -> Unit = {}
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -270,11 +296,24 @@ private fun ModelRow(
         Text(
             text = model.label,
             style = MaterialTheme.typography.bodyLarge,
+            color = if (hidden) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        RadioButton(
-            selected = selected,
-            onClick = onSelect
-        )
+        if (showHide) {
+            IconButton(onClick = onHiddenToggle) {
+                Icon(
+                    imageVector = if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                    contentDescription = if (hidden) "Unhide" else "Hide",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (!hidden) {
+            RadioButton(
+                selected = selected,
+                onClick = onSelect
+            )
+        }
     }
 }

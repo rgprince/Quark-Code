@@ -19,6 +19,7 @@ class ModelStore(private val context: Context) {
         val PROVIDER_ID = stringPreferencesKey("provider_id")
         val MODEL_ID = stringPreferencesKey("model_id")
         val FAVORITES = stringSetPreferencesKey("favorite_models")
+        val HIDDEN = stringSetPreferencesKey("hidden_models")
         val RECENTS = stringPreferencesKey("recent_models")
     }
 
@@ -26,6 +27,7 @@ class ModelStore(private val context: Context) {
         val providerId: String? = null,
         val modelId: String? = null,
         val favorites: Set<String> = emptySet(),
+        val hidden: Set<String> = emptySet(),
         val recents: List<String> = emptyList()
     )
 
@@ -34,6 +36,7 @@ class ModelStore(private val context: Context) {
             providerId = prefs[Keys.PROVIDER_ID],
             modelId = prefs[Keys.MODEL_ID],
             favorites = prefs[Keys.FAVORITES] ?: emptySet(),
+            hidden = prefs[Keys.HIDDEN] ?: emptySet(),
             recents = prefs[Keys.RECENTS]
                 ?.split("\n")
                 ?.filter { it.isNotBlank() }
@@ -63,6 +66,17 @@ class ModelStore(private val context: Context) {
             val current = prefs[Keys.FAVORITES] ?: emptySet()
             result = if (current.contains(key)) current - key else current + key
             prefs[Keys.FAVORITES] = result
+        }
+        return result
+    }
+
+    suspend fun toggleHidden(providerId: String, modelId: String): Set<String> {
+        val key = "$providerId/$modelId"
+        var result = emptySet<String>()
+        context.modelDataStore.edit { prefs ->
+            val current = prefs[Keys.HIDDEN] ?: emptySet()
+            result = if (current.contains(key)) current - key else current + key
+            prefs[Keys.HIDDEN] = result
         }
         return result
     }

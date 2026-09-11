@@ -58,6 +58,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var chatPrefs: ChatPrefs? = null
     private var lastSeenIds = mutableSetOf<String>()
     private val streamedParts = mutableMapOf<String, ChatPart>()
+    private val messageQueue = mutableListOf<String>()
+    private val offlineQueue = mutableListOf<String>()
 
     val hasSession: Boolean get() = sessionId != null
 
@@ -82,13 +84,47 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }.getOrNull()?.let { prefs ->
                 uiState = uiState.copy(
                     autoExpandReasoning = prefs.autoExpand,
-                    detailedTools = prefs.detailed
+                    detailedTools = prefs.detailed,
+                    sendBehavior = prefs.sendBehavior
                 )
             }
         }
         loadCatalog()
         loadRecents()
         startEvents()
+        drainOffline()
+    }
+
+    fun setSendBehavior(value: String) {
+        val behavior = if (value == "queue") "queue" else "interrupt"
+        uiState = uiState.copy(sendBehavior = behavior)
+        viewModelScope.launch { chatPrefs?.setSendBehavior(behavior) }
+    }
+
+    private fun updateQueuedCount() {
+        uiState = uiState.copy(queuedCount = messageQueue.size + offlineQueue.size)
+    }
+
+    // Runs the next queued prompt when idle (send-behavior queue).
+    private fun drainQueue() {
+        if (uiState.sending || messageQueue.isEmpty()) {
+            updateQueuedCount()
+            return
+        }
+        val next = messageQueue.removeAt(0)
+        updateQueuedCount()
+        startRun(next)
+    }
+
+    // Auto-sends prompts composed while offline once a connection attaches.
+    private fun drainOffline() {
+        if (offlineQueue.isEmpty() || api == null) {
+            updateQueuedCount()
+            return
+        }
+        messageQueue.addAll(0, offlineQueue)
+        offlineQueue.clear()
+        drainQueue()
     }
 
     // ---- Catalog + selection (AndCode reconcile) ----
@@ -138,18 +174,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(
                 catalogLoading = false,
                 catalogError = null,
-                catalog = catalog.all.flatMap { provider ->
-                    provider.models.values
-                        .filter { it.status != "deprecated" }
-                        .map { model ->
-                            CatalogModel(
-                                id = "${provider.id}/${model.id.ifEmpty { "?" }}",
-                                label = "${provider.displayName()} / ${model.displayName()}",
-                                providerId = provider.id,
-                                modelId = model.id
-                            )
-                        }
-                },
                 providers = catalog.all.map { ProviderOption(it.id, it.displayName()) },
                 selectedProviderId = providerId,
                 selectedModelKey = if (providerId != null && modelId != null) {
@@ -165,8 +189,41 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 modelRecents = snapshot?.recents ?: emptyList(),
                 stats = if (limit != null) uiState.stats.copy(limit = limit) else uiState.stats
             )
+            rebuildCatalog(snapshot?.hidden ?: emptySet())
             refreshSlashCatalog()
             loadAgents()
+        }
+    }
+
+    private fun allCatalogModels(): List<CatalogModel> =
+        providers.flatMap { provider ->
+            provider.models.values
+                .filter { it.status != "deprecated" }
+                .map { model ->
+                    CatalogModel(
+                        id = "${provider.id}/${model.id.ifEmpty { "?" }}",
+                        label = "${provider.displayName()} / ${model.displayName()}",
+                        providerId = provider.id,
+                        modelId = model.id
+                    )
+                }
+        }
+
+    private fun rebuildCatalog(hidden: Set<String>) {
+        val all = allCatalogModels()
+        uiState = uiState.copy(
+            catalog = all.filter { !hidden.contains(it.id) },
+            hiddenModels = all.filter { hidden.contains(it.id) }
+        )
+    }
+
+    fun toggleHidden(id: String) {
+        val providerId = id.substringBefore('/')
+        val modelId = id.substringAfter('/')
+        if (providerId.isBlank() || modelId.isBlank()) return
+        viewModelScope.launch {
+            val updated = modelStore?.toggleHidden(providerId, modelId) ?: return@launch
+            rebuildCatalog(updated)
         }
     }
 
@@ -206,6 +263,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 modelRecents = snapshot?.recents ?: uiState.modelRecents,
                 stats = if (limit != null) uiState.stats.copy(limit = limit) else uiState.stats
             )
+            // Picking a hidden model unhides it.
+            if (snapshot?.hidden?.contains(id) == true) toggleHidden(id)
         }
     }
 
@@ -256,6 +315,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     favorites = sel.favorites,
                     modelRecents = sel.recents
                 )
+                rebuildCatalog(sel.hidden)
                 return@launch
             }
             selProvider = providerId
@@ -273,6 +333,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 modelRecents = sel.recents,
                 stats = if (limit != null) uiState.stats.copy(limit = limit) else uiState.stats
             )
+            rebuildCatalog(sel.hidden)
         }
     }
 
@@ -467,9 +528,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun send() {
         val text = uiState.input.trim()
-        if (text.isEmpty() || uiState.sending) return
+        if (text.isEmpty()) return
         if (handleSlashInput(text)) {
             uiState = uiState.copy(input = "")
+            return
+        }
+        // Offline: remember and auto-send on next attach (AndCode parity).
+        if (!uiState.connected || api == null) {
+            offlineQueue.add(text)
+            uiState = uiState.copy(input = "")
+            updateQueuedCount()
+            return
+        }
+        // Busy: queue behind the running turn, or interrupt it.
+        if (uiState.sending) {
+            if (uiState.sendBehavior == "queue") {
+                messageQueue.add(text)
+                uiState = uiState.copy(input = "")
+                updateQueuedCount()
+            } else {
+                startRun(text)
+            }
             return
         }
         startRun(text)
@@ -558,6 +637,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     messages = uiState.messages + assistant
                 )
             }
+            drainQueue()
         }
     }
 
@@ -876,6 +956,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 streamedParts.clear()
                 refreshMessages()
                 refreshTodos()
+                drainQueue()
             }
             is ServerEvent.StatusChanged -> {
                 if (event.sessionId != id) return
@@ -883,6 +964,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     uiState = uiState.copy(sending = false, thinking = false)
                     refreshMessages()
                     refreshTodos()
+                    drainQueue()
                 }
             }
             is ServerEvent.SessionCreated -> loadRecents()

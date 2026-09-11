@@ -24,6 +24,7 @@ import com.rg.quarkcode.chat.ChatRoute
 import com.rg.quarkcode.chat.ChatScreen
 import com.rg.quarkcode.chat.ChatViewModel
 import com.rg.quarkcode.chat.ReviewScreen
+import com.rg.quarkcode.settings.ProvidersScreen
 import com.rg.quarkcode.connect.ConnectScreen
 import com.rg.quarkcode.connect.ConnectViewModel
 import com.rg.quarkcode.drawer.QuarkDrawer
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 
 private data object ConnectRoute
 private data object SettingsRoute
+private data object ProvidersRoute
 private data object SchedulesRoute
 private data object DiffRoute
 
@@ -150,6 +152,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onRuntimeChange = chatVm::onRuntimeChange,
                                 onModelChange = chatVm::onModelChange,
                                 onFavoriteToggle = chatVm::toggleFavorite,
+                                onHiddenToggle = chatVm::toggleHidden,
                                 onAgentSelect = chatVm::onAgentChange,
                                 onRetry = chatVm::retry,
                                 onAbort = chatVm::abort,
@@ -186,13 +189,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                     }
                                 },
                                 onThemeChange = settingsVm::setTheme,
-                                onProviderChange = settingsVm::onProviderChange,
-                                onRetryProviders = settingsVm::loadProviders,
-                                onOpenProviderDialog = settingsVm::openProviderDialog,
-                                onAuthKeyChange = settingsVm::onAuthKeyChange,
-                                onSaveProviderKey = settingsVm::saveProviderKey,
-                                onDisconnectProvider = settingsVm::disconnectProvider,
-                                onCloseProviderDialog = settingsVm::closeProviderDialog,
+                                providerSummary = settingsVm.uiState.providers
+                                    .firstOrNull { it.id == settingsVm.uiState.selectedProviderId }
+                                    ?.name?.let { "$it · ${settingsVm.uiState.providers.size} providers" }
+                                    ?: "Choose default & manage API keys",
+                                onOpenProviders = { backStack.add(ProvidersRoute) },
                                 autoExpandReasoning = settingsVm.uiState.autoExpandReasoning,
                                 onAutoExpandChange = { value ->
                                     settingsVm.setAutoExpand(value)
@@ -203,6 +204,8 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                     settingsVm.setDetailedTools(value)
                                     chatVm.setDetailedTools(value)
                                 },
+                                sendBehavior = chatVm.uiState.sendBehavior,
+                                onSendBehaviorChange = chatVm::setSendBehavior,
                                 serverVersion = settingsVm.uiState.serverVersion,
                                 diagnosticsText = settingsVm.diagnosticsText(),
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
@@ -234,6 +237,23 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onTitleChange = chatVm::onReviewTitleChange,
                                 onSaveTitle = chatVm::saveReviewTitle,
                                 onSummarize = chatVm::summarizeSession
+                            )
+                        }
+                        is ProvidersRoute -> NavEntry(key) {
+                            ProvidersScreen(
+                                state = settingsVm.uiState,
+                                onBack = {
+                                    backStack.removeLastOrNull()
+                                    chatVm.refreshSelection()
+                                },
+                                onOpen = settingsVm::loadProviders,
+                                onProviderChange = settingsVm::onProviderChange,
+                                onRetry = settingsVm::loadProviders,
+                                onOpenDialog = settingsVm::openProviderDialog,
+                                onAuthKeyChange = settingsVm::onAuthKeyChange,
+                                onSaveKey = settingsVm::saveProviderKey,
+                                onDisconnect = settingsVm::disconnectProvider,
+                                onCloseDialog = settingsVm::closeProviderDialog
                             )
                         }
                         else -> error("Unknown route: $key")

@@ -64,8 +64,14 @@ Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 - [x] Review screen (drawer): `GET session/{id}/diff` file cards + `PATCH` rename + `POST summarize` (no share endpoint on server)
 
 ## Later (V4+)
-- Changes/review tab, fork/revert, slash autocomplete, terminal + file browser
-- R8 release shrink (debug APK 65M), F-Droid flavor
+- Terminal + file browser, R8 release shrink (debug APK 65M), F-Droid flavor
+- Voice/TTS (needs RECORD_AUDIO), GitHub integration, workspaces, guest browser
+
+## V4.3 batch — opencode-style editor, providers submenu, queue, visibility
+- [x] Composer rebuilt (subagent spec): bordered `surface` card, `BasicTextField` 1-4 lines, model pill ≤168dp left + `weight` spacer + 38dp send pinned right, mode/meter strip BELOW box, 34×3dp `CompactMeter` bar, `imePadding`
+- [x] Settings providers → lazy submenu (`ProvidersRoute` + `ProvidersScreen` search/list/dialog); landing shows summary row only
+- [x] Send queue: Interrupt/Queue toggle (Settings Chat + `ChatPrefs`), `Queued N` pill, drain on idle; offline queue auto-sends on attach
+- [x] Model visibility: hide eye in Show-all mode, Hidden section to unhide, `ModelStore.hidden`, pick unhides
 
 ## Tech stack
 Kotlin 2.3.0, AGP 9.3.2, compileSdk 37, minSdk 28 (native ELF needs API 28+),

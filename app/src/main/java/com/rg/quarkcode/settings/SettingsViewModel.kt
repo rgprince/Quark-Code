@@ -134,7 +134,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun loadAll() {
         loadMcp()
-        loadProviders()
         loadChatPrefs()
         loadServerInfo()
     }

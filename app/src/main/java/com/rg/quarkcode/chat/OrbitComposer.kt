@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,24 +25,23 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,19 +51,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
-// Orbit composer: slash popup, mode + thinking chips, meter-only strip.
-// Cost intentionally NOT shown here (free models + 2-decimal detail live in Context sheet).
+// Orbit composer, opencode/and-code layout: bordered surface card, edge-to-edge
+// BasicTextField on top, action row pinned (model left, send hard-right),
+// mode/meter strip BELOW the box. Cost intentionally absent (Context sheet only).
 @Composable
 fun OrbitComposer(
     input: String,
     model: String,
     meterLabel: String,
+    meterFraction: Float,
     sending: Boolean,
+    queuedCount: Int,
     modes: List<String>,
     mode: String?,
     variants: List<String>,
@@ -79,8 +85,14 @@ fun OrbitComposer(
 ) {
     // Provider name stays out of the box: short model label only.
     val shortModel = model.substringAfter(" / ", model)
-    Column(modifier = modifier.fillMaxWidth()) {
-        if (input.startsWith("/") && slashSuggestions.isNotEmpty()) {            Card(
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .imePadding()
+            .padding(vertical = 8.dp)
+    ) {
+        if (input.startsWith("/") && slashSuggestions.isNotEmpty()) {
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 4.dp),
@@ -124,91 +136,89 @@ fun OrbitComposer(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            tonalElevation = 2.dp,
-            color = MaterialTheme.colorScheme.surfaceVariant
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
-                TextField(
-                    value = input,
-                    onValueChange = onInputChange,
-                    placeholder = { Text("Message…", maxLines = 1) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    maxLines = 6
-                )
-                Row(
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
-                    AssistChip(
-                        onClick = onModelClick,
-                        label = {
-                            Text(
-                                text = shortModel,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        trailingIcon = {
-                            Icon(
-                                Icons.Filled.ExpandMore,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    if (sending) {
-                        FilledIconButton(
-                            onClick = onAbort,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(Icons.Filled.Stop, contentDescription = "Stop")
-                        }
-                    } else {
-                        FilledIconButton(
-                            onClick = onSend,
-                            enabled = input.isNotBlank(),
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(Icons.Filled.Send, contentDescription = "Send")
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp, start = 4.dp, end = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    ModeChip(modes = modes, selected = mode, onSelect = onModeChange)
-                    if (variants.isNotEmpty()) {
-                        ThinkingChip(
-                            options = variants,
-                            selected = selectedVariant,
-                            onSelect = onVariantChange
+                    if (input.isEmpty()) {
+                        Text(
+                            text = "Message…",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Text(
-                        text = meterLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                    BasicTextField(
+                        value = input,
+                        onValueChange = onInputChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 1,
+                        maxLines = 4,
+                        textStyle = TextStyle(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
                     )
                 }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    ModelPill(label = shortModel, onClick = onModelClick)
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (queuedCount > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer
+                        ) {
+                            Text(
+                                text = "Queued $queuedCount",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    FilledIconButton(
+                        onClick = if (sending) onAbort else onSend,
+                        enabled = sending || input.isNotBlank(),
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (sending) Icons.Filled.Stop else Icons.AutoMirrored.Filled.Send,
+                            contentDescription = if (sending) "Stop" else "Send",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            ModeChip(modes = modes, selected = mode, onSelect = onModeChange)
+            if (variants.isNotEmpty()) {
+                ThinkingChip(
+                    options = variants,
+                    selected = selectedVariant,
+                    onSelect = onVariantChange
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            CompactMeter(fraction = meterFraction, label = meterLabel)
         }
         // Glow light below the editor: visible + pulsing while opencode works.
         Box(
@@ -245,6 +255,41 @@ fun OrbitComposer(
 }
 
 @Composable
+private fun ModelPill(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .widthIn(max = 168.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(100.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Icon(
+                Icons.Filled.ArrowDropDown,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ModeChip(
     modes: List<String>,
     selected: String?,
@@ -256,9 +301,11 @@ private fun ModeChip(
     val label = selected?.takeIf { modes.contains(it) } ?: modes.firstOrNull() ?: "build"
     Box(modifier = modifier) {
         Surface(
-            modifier = Modifier.clickable(onClick = { expanded = true }),
+            modifier = Modifier
+                .widthIn(max = 92.dp)
+                .clickable(onClick = { expanded = true }),
             shape = RoundedCornerShape(100.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
         ) {
             Row(
@@ -267,7 +314,13 @@ private fun ModeChip(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Icon(Icons.Filled.Shield, contentDescription = null, modifier = Modifier.size(14.dp))
-                Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(14.dp))
             }
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -294,7 +347,7 @@ private fun ThinkingChip(
             modifier = Modifier.clickable(onClick = { expanded = true }),
             shape = RoundedCornerShape(100.dp),
             color = if (selected != null) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerHigh,
+            else MaterialTheme.colorScheme.surfaceVariant,
             contentColor = if (selected != null) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant
         ) {
@@ -323,5 +376,40 @@ private fun ThinkingChip(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CompactMeter(
+    fraction: Float,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    val color = when {
+        fraction >= 0.9f -> MaterialTheme.colorScheme.error
+        fraction >= 0.7f -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Column(
+        modifier = modifier.padding(horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        LinearProgressIndicator(
+            progress = { fraction.coerceIn(0f, 1f) },
+            modifier = Modifier.width(34.dp).height(3.dp),
+            color = color,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt,
+            gapSize = 0.dp,
+            drawStopIndicator = false
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
     }
 }

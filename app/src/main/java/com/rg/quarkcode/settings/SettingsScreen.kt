@@ -16,14 +16,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,7 +32,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -64,17 +61,14 @@ fun SettingsScreen(
     onPasswordChange: (String) -> Unit,
     onTestAndSave: () -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
-    onProviderChange: (String) -> Unit,
-    onRetryProviders: () -> Unit,
-    onOpenProviderDialog: (String) -> Unit,
-    onAuthKeyChange: (String) -> Unit,
-    onSaveProviderKey: () -> Unit,
-    onDisconnectProvider: () -> Unit,
-    onCloseProviderDialog: () -> Unit,
+    providerSummary: String,
+    onOpenProviders: () -> Unit,
     autoExpandReasoning: Boolean,
     onAutoExpandChange: (Boolean) -> Unit,
     detailedTools: Boolean,
     onDetailedChange: (Boolean) -> Unit,
+    sendBehavior: String,
+    onSendBehaviorChange: (String) -> Unit,
     serverVersion: String?,
     diagnosticsText: String,
     onNewMcpNameChange: (String) -> Unit,
@@ -106,48 +100,19 @@ fun SettingsScreen(
         ) {
             item(key = "providers") {
                 SettingsSection(title = "Default provider", icon = Icons.Filled.Storage) {
-                    if (state.providersLoading) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("Loading providers…", style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    state.providersError?.let { message ->
-                        Text(text = message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedButton(onClick = onRetryProviders) { Text("Retry") }
-                    }
-                    if (!state.providersLoading && state.providersError == null && state.providers.isEmpty()) {
-                        Text(
-                            text = "Connect first, then pick the provider used for new chats. The model picker will only show this provider.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    state.providers.forEach { provider ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenProviderDialog(provider.id) },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = state.selectedProviderId == provider.id,
-                                onClick = { onProviderChange(provider.id) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenProviders),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Providers & API keys", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = providerSummary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = provider.name, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    text = if (provider.connected) "Connected · tap for API key" else "Not connected · tap to add key",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (provider.connected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.error
-                                )
-                            }
-                            if (state.selectedProviderId == provider.id) {
-                                Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            }
                         }
                     }
                 }
@@ -248,6 +213,28 @@ fun SettingsScreen(
                         }
                         Switch(checked = detailedTools, onCheckedChange = onDetailedChange)
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = { onSendBehaviorChange(if (sendBehavior == "queue") "interrupt" else "queue") }),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Send while busy", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = if (sendBehavior == "queue") "Queue behind the running turn"
+                                else "Interrupt the running turn",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = if (sendBehavior == "queue") "Queue" else "Interrupt",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
             item(key = "mcp") {
@@ -343,20 +330,11 @@ fun SettingsScreen(
             }
             item(key = "bottom-space") { Spacer(modifier = Modifier.height(16.dp)) }
         }
-        state.authDialog?.let { dialog ->
-            ProviderAuthDialog(
-                dialog = dialog,
-                onKeyChange = onAuthKeyChange,
-                onSave = onSaveProviderKey,
-                onDisconnect = onDisconnectProvider,
-                onDismiss = onCloseProviderDialog
-            )
-        }
     }
 }
 
 @Composable
-private fun ProviderAuthDialog(
+fun ProviderAuthDialog(
     dialog: ProviderAuthDialog,
     onKeyChange: (String) -> Unit,
     onSave: () -> Unit,
