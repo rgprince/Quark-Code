@@ -176,7 +176,6 @@ fun ChatScreen(
                     messages = state.messages,
                     expandedParts = state.expandedParts,
                     thinking = state.thinking,
-                    autoExpandReasoning = state.autoExpandReasoning,
                     speakingId = state.speakingId,
                     thoughtMs = lastThoughtMs,
                     thoughtText = lastThoughtText,

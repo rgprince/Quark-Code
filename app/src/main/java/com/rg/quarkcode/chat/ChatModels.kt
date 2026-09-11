@@ -54,17 +54,24 @@ data class ModelUsage(
     val label: String,
     val provider: String,
     val tokens: Long = 0L,
+    val cache: Long = 0L,
     val cost: Double = 0.0,
     val messages: Int = 0
-)
+) {
+    // Same accounting as the chat ring: context = input + cache reads.
+    val context: Long get() = tokens + cache
+}
 
 data class UsageTotals(
     val input: Long = 0L,
     val output: Long = 0L,
+    val cache: Long = 0L,
     val cost: Double = 0.0,
     val sessions: Int = 0,
     val byModel: List<ModelUsage> = emptyList()
-)
+) {
+    val total: Long get() = input + output + cache
+}
 
 data class UsageState(
     val scanning: Boolean = false,
@@ -101,7 +108,6 @@ data class ChatUiState(
     val variants: List<String> = emptyList(),
     val selectedVariant: String? = null,
     val slashCommands: List<SlashSuggestion> = emptyList(),
-    val autoExpandReasoning: Boolean = false,
     val detailedTools: Boolean = false,
     val textScale: Float = 1f,
     val sendBehavior: String = "interrupt",

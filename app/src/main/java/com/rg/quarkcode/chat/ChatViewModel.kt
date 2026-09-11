@@ -94,7 +94,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 withContext(Dispatchers.IO) { chatPrefs!!.prefs.first() }
             }.getOrNull()?.let { prefs ->
                 uiState = uiState.copy(
-                    autoExpandReasoning = prefs.autoExpand,
                     detailedTools = prefs.detailed,
                     sendBehavior = prefs.sendBehavior,
                     autoSpeak = prefs.autoSpeak,
@@ -302,11 +301,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onVariantChange(variant: String?) {
         uiState = uiState.copy(selectedVariant = variant)
-    }
-
-    fun setAutoExpand(value: Boolean) {
-        uiState = uiState.copy(autoExpandReasoning = value)
-        viewModelScope.launch { chatPrefs?.setAutoExpand(value) }
     }
 
     fun setDetailedTools(value: Boolean) {
@@ -1328,6 +1322,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val monthCut = now - 30L * 24 * 60 * 60 * 1000
             var tIn = 0L
             var tOut = 0L
+            var tCache = 0L
             var tCost = 0.0
             val buckets = mutableMapOf<UsagePeriod, Bucket>()
             UsagePeriod.entries.forEach { buckets[it] = Bucket() }
@@ -1339,10 +1334,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val tok = session.tokens
                 val sIn = tok?.input ?: 0L
                 val sOut = (tok?.output ?: 0L) + (tok?.reasoning ?: 0L)
-                val sTok = sIn + sOut
+                val sCache = tok?.cache?.read ?: 0L
+                val sTok = sIn + sOut + sCache
                 val created = session.time.created.takeIf { it > 0 } ?: now
                 tIn += sIn
                 tOut += sOut
+                tCache += sCache
                 tCost += session.cost
                 val inWeek = created >= weekCut
                 val inMonth = created >= monthCut
@@ -1354,9 +1351,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     ?: emptyList()
                 val assistant = messages.filter { it.info.role == "assistant" }
                 if (assistant.isEmpty()) {
-                    buckets[UsagePeriod.ALL]!!.add("unknown", "", sIn, sOut, 0, 0.0)
-                    if (inWeek) buckets[UsagePeriod.WEEK]!!.add("unknown", "", sIn, sOut, 0, 0.0)
-                    if (inMonth) buckets[UsagePeriod.MONTH]!!.add("unknown", "", sIn, sOut, 0, 0.0)
+                    buckets[UsagePeriod.ALL]!!.add("unknown", "", sIn, sOut, sCache, 0, 0.0)
+                    if (inWeek) buckets[UsagePeriod.WEEK]!!.add("unknown", "", sIn, sOut, sCache, 0, 0.0)
+                    if (inMonth) buckets[UsagePeriod.MONTH]!!.add("unknown", "", sIn, sOut, sCache, 0, 0.0)
                 } else {
                     val groups = assistant.groupBy {
                         val ref = it.info.model
@@ -1371,17 +1368,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         val mOut = list.sumOf {
                             (it.info.tokens?.output ?: 0L) + (it.info.tokens?.reasoning ?: 0L)
                         }
-                        val mTok = mIn + mOut
+                        val mCache = list.sumOf { it.info.tokens?.cache?.read ?: 0L }
+                        val mTok = mIn + mOut + mCache
                         val share = if (sTok > 0) mTok.toDouble() / sTok else 0.0
                         val mCost = session.cost * share
                         val latest = list.maxOfOrNull { it.info.time.created }?.takeIf { it > 0 }
                             ?: created
-                        buckets[UsagePeriod.ALL]!!.add(mid, pid, mIn, mOut, list.size, mCost)
+                        buckets[UsagePeriod.ALL]!!.add(mid, pid, mIn, mOut, mCache, list.size, mCost)
                         if (latest >= weekCut) {
-                            buckets[UsagePeriod.WEEK]!!.add(mid, pid, mIn, mOut, list.size, mCost)
+                            buckets[UsagePeriod.WEEK]!!.add(mid, pid, mIn, mOut, mCache, list.size, mCost)
                         }
                         if (latest >= monthCut) {
-                            buckets[UsagePeriod.MONTH]!!.add(mid, pid, mIn, mOut, list.size, mCost)
+                            buckets[UsagePeriod.MONTH]!!.add(mid, pid, mIn, mOut, mCache, list.size, mCost)
                         }
                     }
                 }
@@ -1389,10 +1387,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             usageState = usageState.copy(
                 scanning = false,
                 scannedAt = now,
-                all = UsageTotals(tIn, tOut, tCost, scoped.size, buckets[UsagePeriod.ALL]!!.totals()),
+                all = UsageTotals(
+                    tIn, tOut, tCache, tCost, scoped.size,
+                    buckets[UsagePeriod.ALL]!!.totals()
+                ),
                 week = UsageTotals(
                     buckets[UsagePeriod.WEEK]!!.input,
                     buckets[UsagePeriod.WEEK]!!.output,
+                    buckets[UsagePeriod.WEEK]!!.cacheRead,
                     buckets[UsagePeriod.WEEK]!!.cost,
                     buckets[UsagePeriod.WEEK]!!.sessions,
                     buckets[UsagePeriod.WEEK]!!.totals()
@@ -1400,6 +1402,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 month = UsageTotals(
                     buckets[UsagePeriod.MONTH]!!.input,
                     buckets[UsagePeriod.MONTH]!!.output,
+                    buckets[UsagePeriod.MONTH]!!.cacheRead,
                     buckets[UsagePeriod.MONTH]!!.cost,
                     buckets[UsagePeriod.MONTH]!!.sessions,
                     buckets[UsagePeriod.MONTH]!!.totals()
@@ -1411,6 +1414,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private class Bucket {
         var input = 0L
         var output = 0L
+        var cacheRead = 0L
         var cost = 0.0
         var sessions = 0
         private val models = mutableMapOf<String, ModelUsage>()
@@ -1424,11 +1428,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             provider: String,
             inT: Long,
             outT: Long,
+            cacheT: Long,
             messages: Int,
             cost: Double
         ) {
             input += inT
             output += outT
+            cacheRead += cacheT
             this.cost += cost
             val key = "$provider/$label"
             val prev = models[key]
@@ -1436,13 +1442,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 label = label,
                 provider = provider,
                 tokens = (prev?.tokens ?: 0L) + inT + outT,
+                cache = (prev?.cache ?: 0L) + cacheT,
                 cost = (prev?.cost ?: 0.0) + cost,
                 messages = (prev?.messages ?: 0) + messages
             )
         }
 
         fun totals(): List<ModelUsage> =
-            models.values.sortedByDescending { it.tokens }
+            models.values.sortedByDescending { it.context }
     }
 
     private fun refreshCost(id: String) {

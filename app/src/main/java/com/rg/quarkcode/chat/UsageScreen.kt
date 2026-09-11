@@ -1,6 +1,9 @@
 package com.rg.quarkcode.chat
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,7 +39,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -205,7 +212,7 @@ fun UsageScreen(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = shortTokens(totals.input + totals.output),
+                                text = shortTokens(totals.total),
                                 style = MaterialTheme.typography.displaySmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
@@ -213,7 +220,9 @@ fun UsageScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "in ${shortTokens(totals.input)} · out ${shortTokens(totals.output)}",
+                                text = "in ${shortTokens(totals.input)} · " +
+                                    "cache ${shortTokens(totals.cache)} · " +
+                                    "out ${shortTokens(totals.output)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -238,12 +247,18 @@ fun UsageScreen(
                         )
                     }
                 } else {
-                    val maxTokens = totals.byModel.maxOf { it.tokens }.coerceAtLeast(1L)
+                    val maxTokens = totals.byModel.maxOf { it.context }.coerceAtLeast(1L)
                     item(key = "models-header") {
                         Text(
                             text = "By model",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    item(key = "donut") {
+                        ModelDonut(
+                            list = totals.byModel,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                     items(totals.byModel, key = { it.provider + "/" + it.label }) { usage ->
@@ -288,6 +303,87 @@ fun UsageScreen(
                 }
             }
         )
+    }
+}
+
+// Donut of context share by model, drawn on Canvas (no new dependency).
+@Composable
+private fun ModelDonut(
+    list: List<ModelUsage>,
+    modifier: Modifier = Modifier
+) {
+    val palette = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.error,
+        MaterialTheme.colorScheme.outline
+    )
+    val total = list.sumOf { it.context }.coerceAtLeast(1L)
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .size(110.dp)
+                    .semantics { contentDescription = "Token share by model" }
+            ) {
+                var start = -90f
+                list.forEachIndexed { index, usage ->
+                    val sweep = 360f * (usage.context.toFloat() / total)
+                    if (sweep > 0.5f) {
+                        drawArc(
+                            color = palette[index % palette.size],
+                            startAngle = start,
+                            sweepAngle = sweep - 2f,
+                            useCenter = false,
+                            style = Stroke(width = 36f, cap = StrokeCap.Round)
+                        )
+                    }
+                    start += sweep
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                list.take(5).forEachIndexed { index, usage ->
+                    val pct = (usage.context * 100 / total).coerceIn(0L, 100L)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(palette[index % palette.size])
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = usage.label.ifBlank { "unknown" },
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "$pct%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -345,7 +441,7 @@ private fun ModelUsageRow(usage: ModelUsage, maxTokens: Long, modifier: Modifier
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = shortTokens(usage.tokens),
+                        text = shortTokens(usage.context),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -357,9 +453,14 @@ private fun ModelUsageRow(usage: ModelUsage, maxTokens: Long, modifier: Modifier
                     )
                 }
             }
+            Text(
+                text = "${shortTokens(usage.tokens)} new + ${shortTokens(usage.cache)} cache",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(modifier = Modifier.height(8.dp))
             LinearProgressIndicator(
-                progress = { (usage.tokens.toFloat() / maxTokens).coerceIn(0f, 1f) },
+                progress = { (usage.context.toFloat() / maxTokens).coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp),

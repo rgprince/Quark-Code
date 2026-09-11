@@ -16,7 +16,6 @@ private val Context.chatPrefsDataStore by preferencesDataStore(name = "quark_cha
 class ChatPrefs(private val context: Context) {
 
     private object Keys {
-        val AUTO_EXPAND = booleanPreferencesKey("auto_expand_reasoning")
         val DETAILED_TOOLS = booleanPreferencesKey("detailed_tools")
         val SEND_BEHAVIOR = stringPreferencesKey("send_behavior")
         val AUTO_SPEAK = booleanPreferencesKey("auto_speak")
@@ -24,7 +23,6 @@ class ChatPrefs(private val context: Context) {
     }
 
     data class Prefs(
-        val autoExpand: Boolean = false,
         val detailed: Boolean = false,
         val sendBehavior: String = "interrupt",
         val autoSpeak: Boolean = false,
@@ -33,16 +31,11 @@ class ChatPrefs(private val context: Context) {
 
     val prefs: Flow<Prefs> = context.chatPrefsDataStore.data.map {
         Prefs(
-            autoExpand = it[Keys.AUTO_EXPAND] == true,
             detailed = it[Keys.DETAILED_TOOLS] == true,
             sendBehavior = it[Keys.SEND_BEHAVIOR] ?: "interrupt",
             autoSpeak = it[Keys.AUTO_SPEAK] == true,
             textScale = (it[Keys.TEXT_SCALE] ?: 1f).coerceIn(0.8f, 1.3f)
         )
-    }
-
-    suspend fun setAutoExpand(value: Boolean) {
-        context.chatPrefsDataStore.edit { it[Keys.AUTO_EXPAND] = value }
     }
 
     suspend fun setDetailed(value: Boolean) {

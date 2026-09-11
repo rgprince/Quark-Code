@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
@@ -144,7 +143,6 @@ fun AssistantActivitySheet(
     parts: List<ChatPart>,
     messageId: String,
     modifier: Modifier = Modifier,
-    autoExpandReasoning: Boolean = false,
     detailedTools: Boolean = false,
     onToggleTodo: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
@@ -172,9 +170,11 @@ fun AssistantActivitySheet(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(parts.filter { (it as? ChatPart.Reasoning)?.text?.isNotBlank() != false }, key = { it.id }) { part ->
+            items(
+                parts.filter { it is ChatPart.Tool || it is ChatPart.Patch },
+                key = { it.id }
+            ) { part ->
                 when (part) {
-                    is ChatPart.Reasoning -> ReasoningCard(part = part, autoExpand = autoExpandReasoning, expanded = null, onToggle = null)
                     is ChatPart.Tool -> QuarkToolCard(part = part, messageId = messageId, detailed = detailedTools, onToggleTodo = onToggleTodo)
                     is ChatPart.Patch -> PatchSheetCard(files = part.files)
                     else -> Unit
@@ -184,71 +184,6 @@ fun AssistantActivitySheet(
     }
 }
 
-@Composable
-fun ReasoningCard(
-    part: ChatPart.Reasoning,
-    modifier: Modifier = Modifier,
-    autoExpand: Boolean = false,
-    expanded: Boolean? = null,
-    onToggle: (() -> Unit)? = null
-) {
-    if (part.text.isBlank() && expanded == false) return
-    var internal by remember { mutableStateOf(autoExpand) }
-    val isOpen = expanded ?: internal
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Psychology,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Thinking",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = { if (onToggle != null) onToggle() else internal = !internal },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = if (isOpen) "Collapse reasoning" else "Expand reasoning",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-            if (isOpen) {
-                Text(
-                    text = part.text.ifBlank { "No reasoning captured." },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Text(
-                    text = part.text.lineSequence().firstOrNull().orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-// Terminal-style tool row: one line collapsed (dot + icon + mono name +
-// pretty summary), details only on expand. Errors auto-expand.
 @Composable
 fun QuarkToolCard(
     part: ChatPart.Tool,

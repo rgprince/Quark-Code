@@ -201,11 +201,6 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                     ?.name?.let { "$it · ${settingsVm.uiState.providers.size} providers" }
                                     ?: "Choose default & manage API keys",
                                 onOpenProviders = { backStack.add(ProvidersRoute) },
-                                autoExpandReasoning = settingsVm.uiState.autoExpandReasoning,
-                                onAutoExpandChange = { value ->
-                                    settingsVm.setAutoExpand(value)
-                                    chatVm.setAutoExpand(value)
-                                },
                                 detailedTools = settingsVm.uiState.detailedTools,
                                 onDetailedChange = { value ->
                                     settingsVm.setDetailedTools(value)

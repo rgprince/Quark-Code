@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
@@ -75,7 +74,6 @@ fun MessageList(
     messages: List<ChatMessage>,
     expandedParts: Set<String>,
     thinking: Boolean,
-    autoExpandReasoning: Boolean,
     speakingId: String?,
     thoughtMs: Long? = null,
     thoughtText: String = "",
@@ -203,16 +201,8 @@ fun MessageList(
                                 Spacer(modifier = Modifier.height(6.dp))
                                 entry.parts.forEach { part ->
                                     when (part) {
-                                        is ChatPart.Reasoning -> {
-                                            if (part.text.isNotBlank()) {
-                                                ReasoningCard(
-                                                    part = part,
-                                                    expanded = autoExpandReasoning || expandedParts.contains(part.id),
-                                                    onToggle = { onTogglePart(part.id) }
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                            }
-                                        }
+                                        // Reasoning lives in the "thought for Xs" line now.
+                                        is ChatPart.Reasoning -> Unit
                                         is ChatPart.Tool -> {
                                             if (part.name == "todowrite" && part.todos.isNotEmpty()) {
                                                 TodoCard(todos = part.todos, onToggle = null)
@@ -320,7 +310,6 @@ fun MessageList(
             AssistantActivitySheet(
                 parts = sheetParts,
                 messageId = "",
-                autoExpandReasoning = autoExpandReasoning,
                 detailedTools = detailedTools,
                 onToggleTodo = onToggleTodo,
                 onDismiss = { sheetGroupId = null }

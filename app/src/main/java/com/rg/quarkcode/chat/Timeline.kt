@@ -142,7 +142,6 @@ fun String.toToolCategory(): ToolCategory = when (lowercase()) {
 
 fun summarizeActivity(parts: List<ChatPart>): String {
     val tools = parts.filterIsInstance<ChatPart.Tool>()
-    val reasoning = parts.filterIsInstance<ChatPart.Reasoning>().count { it.text.isNotBlank() }
     val patches = parts.filterIsInstance<ChatPart.Patch>().size
     if (parts.isEmpty()) return "Activity"
     val phrases = mutableListOf<String>()
@@ -161,7 +160,6 @@ fun summarizeActivity(parts: List<ChatPart>): String {
         if (subs > 0) phrases.add("sub $subs")
         if (other > 0 && tools.size <= 2) phrases.add(tools.first().name)
     }
-    if (reasoning > 0) phrases.add("thinking")
     return phrases.joinToString(" · ").ifEmpty { "Activity" }
 }
 

@@ -80,8 +80,6 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     providerSummary: String,
     onOpenProviders: () -> Unit,
-    autoExpandReasoning: Boolean,
-    onAutoExpandChange: (Boolean) -> Unit,
     detailedTools: Boolean,
     onDetailedChange: (Boolean) -> Unit,
     textScale: Float,
@@ -302,13 +300,6 @@ fun SettingsScreen(
                 SettingsTab.CHAT -> {
                     item(key = "chat") {
                         SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
-                            ChatToggle(
-                                title = "Auto-expand thinking",
-                                subtitle = "Open reasoning cards without tapping",
-                                checked = autoExpandReasoning,
-                                onCheckedChange = onAutoExpandChange
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
                             ChatToggle(
                                 title = "Detailed tool cards",
                                 subtitle = "Expand tool input/output by default",

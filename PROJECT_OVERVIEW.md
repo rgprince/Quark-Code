@@ -157,6 +157,17 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
   sessions): week/month/all totals, per-model bars, server cost (Free shown),
   pro-rata per-model cost split
 
+## V5.6 scope — honest usage + no old thinking + R8 release
+- [x] Usage accounting fixed to match the chat ring: totals now include
+  cache reads (input + cache + output), so ~65M-style sessions add up;
+  per-model rows show new + cache split
+- [x] By-model donut pie chart (Canvas, no new dep) with % legend
+- [x] Old thinking UI deleted: ReasoningCard gone (inline + sheet), thought
+  line is the only reasoning surface; auto-expand pref/settings/VM removed
+- [x] R8 release only (debug ignored): minify + shrinkResources +
+  proguard-rules.pro (serialization/DataStore), debug-signed installable
+  APK, v0.2.0 (code 2), workflow builds `assembleRelease` → quark-release-apk
+
 ## V5.3 scope — editor rework + crash + text size + audit
 - [x] Crash on typing `/` fixed: slash list deduped by name (backend often
   redefines /help//new/…) + unique popup keys
