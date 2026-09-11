@@ -44,6 +44,41 @@ data class RecentSession(
     val title: String
 )
 
+enum class UsagePeriod(val label: String) {
+    WEEK("Week"),
+    MONTH("Month"),
+    ALL("All time")
+}
+
+data class ModelUsage(
+    val label: String,
+    val provider: String,
+    val tokens: Long = 0L,
+    val cost: Double = 0.0,
+    val messages: Int = 0
+)
+
+data class UsageTotals(
+    val input: Long = 0L,
+    val output: Long = 0L,
+    val cost: Double = 0.0,
+    val sessions: Int = 0,
+    val byModel: List<ModelUsage> = emptyList()
+)
+
+data class UsageState(
+    val scanning: Boolean = false,
+    val scanned: Int = 0,
+    val total: Int = 0,
+    val confirmScan: Boolean = false,
+    val error: String? = null,
+    val scannedAt: Long = 0L,
+    val period: UsagePeriod = UsagePeriod.ALL,
+    val all: UsageTotals = UsageTotals(),
+    val week: UsageTotals = UsageTotals(),
+    val month: UsageTotals = UsageTotals()
+)
+
 data class ReviewState(
     val files: List<com.rg.quarkcode.backend.OpenCodeFileChange> = emptyList(),
     val loading: Boolean = false,

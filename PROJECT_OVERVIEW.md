@@ -144,6 +144,19 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Settings filled: connection quick-fill chips, Look text-size preview,
   Termux start-command copy, About fact rows (all zero-backend-cost)
 
+## V5.5 scope — model menu, drawer, pill, thinking, usage
+- [x] Model menu redesigned custom (non-M3 rows): full names wrap to 2 lines,
+  provider/id mono line, check-circle select, thinking-effort chips in-sheet
+- [x] Drawer icon is a custom 2-line mark; drawer redesigned (identity header,
+  Chats/Workspace/System sections, keyed recents with icons)
+- [x] Composer: robo icon replaced by a small model-name pill (variant control
+  moved into the model sheet)
+- [x] Thinking is an italic line with a secondary side bar + duration; tap
+  expands the reasoning
+- [x] Server-info screen removed; new Usage screen (confirm → scan ≤30
+  sessions): week/month/all totals, per-model bars, server cost (Free shown),
+  pro-rata per-model cost split
+
 ## V5.3 scope — editor rework + crash + text size + audit
 - [x] Crash on typing `/` fixed: slash list deduped by name (backend often
   redefines /help//new/…) + unique popup keys

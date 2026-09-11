@@ -67,6 +67,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val offlineQueue = mutableListOf<String>()
     private var atJob: Job? = null
     private var tts: TextToSpeech? = null
+    private var usageJob: Job? = null
+
+    var usageState by mutableStateOf(UsageState())
+        private set
 
     val hasSession: Boolean get() = sessionId != null
 
@@ -1276,6 +1280,170 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         }
+    }
+
+    // ---- Usage stats ----
+
+    fun requestUsageScan() {
+        usageState = usageState.copy(confirmScan = true)
+    }
+
+    fun dismissUsageConfirm() {
+        usageState = usageState.copy(confirmScan = false)
+    }
+
+    fun stopScan() {
+        usageJob?.cancel()
+        usageState = usageState.copy(scanning = false)
+    }
+
+    fun setUsagePeriod(period: UsagePeriod) {
+        usageState = usageState.copy(period = period)
+    }
+
+    // Scans up to 30 recent sessions: session-level cost/tokens/time plus
+    // per-message model attribution (cost pro-rata by token share).
+    fun scanUsage() {
+        val client = api
+        if (client == null) {
+            usageState = usageState.copy(confirmScan = false, error = "Not connected")
+            return
+        }
+        usageJob?.cancel()
+        usageState = UsageState(scanning = true)
+        usageJob = viewModelScope.launch {
+            val sessions = runCatching {
+                client.getList<com.rg.quarkcode.backend.SessionInfo>("session")
+            }.getOrNull()
+            if (sessions == null) {
+                usageState = usageState.copy(scanning = false, error = "Couldn't reach the server")
+                return@launch
+            }
+            val scoped = sessions
+                .filter { it.time.archived == null }
+                .sortedByDescending { it.time.created }
+                .take(30)
+            val now = System.currentTimeMillis()
+            val weekCut = now - 7L * 24 * 60 * 60 * 1000
+            val monthCut = now - 30L * 24 * 60 * 60 * 1000
+            var tIn = 0L
+            var tOut = 0L
+            var tCost = 0.0
+            val buckets = mutableMapOf<UsagePeriod, Bucket>()
+            UsagePeriod.entries.forEach { buckets[it] = Bucket() }
+            scoped.forEachIndexed { index, session ->
+                usageState = usageState.copy(
+                    scanned = index + 1,
+                    total = scoped.size,
+                    sessions = scoped.size
+                )
+                val tok = session.tokens
+                val sIn = tok?.input ?: 0L
+                val sOut = (tok?.output ?: 0L) + (tok?.reasoning ?: 0L)
+                val sTok = sIn + sOut
+                val created = session.time.created.takeIf { it > 0 } ?: now
+                tIn += sIn
+                tOut += sOut
+                tCost += session.cost
+                val inWeek = created >= weekCut
+                val inMonth = created >= monthCut
+                buckets[UsagePeriod.ALL]!!.countSession()
+                if (inWeek) buckets[UsagePeriod.WEEK]!!.countSession()
+                if (inMonth) buckets[UsagePeriod.MONTH]!!.countSession()
+                // Per-model attribution from assistant messages (best effort).
+                val messages = runCatching { client.messages(session.id) }.getOrNull()
+                    ?: emptyList()
+                val assistant = messages.filter { it.info.role == "assistant" }
+                if (assistant.isEmpty()) {
+                    buckets[UsagePeriod.ALL]!!.add("unknown", "", sIn, sOut, 0, 0.0)
+                    if (inWeek) buckets[UsagePeriod.WEEK]!!.add("unknown", "", sIn, sOut, 0, 0.0)
+                    if (inMonth) buckets[UsagePeriod.MONTH]!!.add("unknown", "", sIn, sOut, 0, 0.0)
+                } else {
+                    val groups = assistant.groupBy {
+                        val ref = it.info.model
+                        val pid = ref?.providerId.orEmpty()
+                        val mid = ref?.modelId.orEmpty()
+                        if (pid.isBlank() && mid.isBlank()) "unknown/" else "$pid/$mid"
+                    }
+                    groups.forEach { (key, list) ->
+                        val pid = key.substringBefore("/")
+                        val mid = key.substringAfter("/").ifEmpty { "unknown" }
+                        val mIn = list.sumOf { it.info.tokens?.input ?: 0L }
+                        val mOut = list.sumOf {
+                            (it.info.tokens?.output ?: 0L) + (it.info.tokens?.reasoning ?: 0L)
+                        }
+                        val mTok = mIn + mOut
+                        val share = if (sTok > 0) mTok.toDouble() / sTok else 0.0
+                        val mCost = session.cost * share
+                        val latest = list.maxOfOrNull { it.info.time.created }?.takeIf { it > 0 }
+                            ?: created
+                        buckets[UsagePeriod.ALL]!!.add(mid, pid, mIn, mOut, list.size, mCost)
+                        if (latest >= weekCut) {
+                            buckets[UsagePeriod.WEEK]!!.add(mid, pid, mIn, mOut, list.size, mCost)
+                        }
+                        if (latest >= monthCut) {
+                            buckets[UsagePeriod.MONTH]!!.add(mid, pid, mIn, mOut, list.size, mCost)
+                        }
+                    }
+                }
+            }
+            usageState = usageState.copy(
+                scanning = false,
+                scannedAt = now,
+                all = UsageTotals(tIn, tOut, tCost, scoped.size, buckets[UsagePeriod.ALL]!!.totals()),
+                week = UsageTotals(
+                    buckets[UsagePeriod.WEEK]!!.input,
+                    buckets[UsagePeriod.WEEK]!!.output,
+                    buckets[UsagePeriod.WEEK]!!.cost,
+                    buckets[UsagePeriod.WEEK]!!.sessions,
+                    buckets[UsagePeriod.WEEK]!!.totals()
+                ),
+                month = UsageTotals(
+                    buckets[UsagePeriod.MONTH]!!.input,
+                    buckets[UsagePeriod.MONTH]!!.output,
+                    buckets[UsagePeriod.MONTH]!!.cost,
+                    buckets[UsagePeriod.MONTH]!!.sessions,
+                    buckets[UsagePeriod.MONTH]!!.totals()
+                )
+            )
+        }
+    }
+
+    private class Bucket {
+        var input = 0L
+        var output = 0L
+        var cost = 0.0
+        var sessions = 0
+        private val models = mutableMapOf<String, ModelUsage>()
+
+        fun countSession() {
+            sessions++
+        }
+
+        fun add(
+            label: String,
+            provider: String,
+            inT: Long,
+            outT: Long,
+            messages: Int,
+            cost: Double
+        ) {
+            input += inT
+            output += outT
+            this.cost += cost
+            val key = "$provider/$label"
+            val prev = models[key]
+            models[key] = ModelUsage(
+                label = label,
+                provider = provider,
+                tokens = (prev?.tokens ?: 0L) + inT + outT,
+                cost = (prev?.cost ?: 0.0) + cost,
+                messages = (prev?.messages ?: 0) + messages
+            )
+        }
+
+        fun totals(): List<ModelUsage> =
+            models.values.sortedByDescending { it.tokens }
     }
 
     private fun refreshCost(id: String) {

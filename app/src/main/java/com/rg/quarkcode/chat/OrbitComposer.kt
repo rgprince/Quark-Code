@@ -32,7 +32,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Badge
@@ -42,7 +41,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
@@ -266,20 +264,38 @@ fun OrbitComposer(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        IconButton(
-                            onClick = onModelClick,
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             modifier = Modifier
-                                .size(48.dp)
+                                .heightIn(min = 40.dp)
+                                .clickable(
+                                    onClick = onModelClick,
+                                    role = Role.Button
+                                )
                                 .semantics {
                                     contentDescription = "Model $shortModel, open model menu"
                                 }
                         ) {
-                            Icon(
-                                Icons.Filled.SmartToy,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.SmartToy,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = shortModel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 110.dp)
+                                )
+                            }
                         }
                         Text(
                             text = meterLabel.substringBefore(" / ") +
@@ -291,13 +307,6 @@ fun OrbitComposer(
                                 contentDescription = "Context $meterLabel used"
                             }
                         )
-                        if (variants.isNotEmpty()) {
-                            VariantMini(
-                                options = variants,
-                                selected = selectedVariant,
-                                onSelect = onVariantChange
-                            )
-                        }
                         Spacer(modifier = Modifier.weight(1f))
                         if (queuedCount > 0) {
                             Badge(
@@ -411,63 +420,6 @@ private fun ModeStrip(
                 onClick = { onSelect(entry); expanded = false },
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun VariantMini(
-    options: List<String>,
-    selected: String?,
-    onSelect: (String?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        Surface(
-            shape = RoundedCornerShape(100.dp),
-            color = if (selected != null) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier
-                .heightIn(min = 40.dp)
-                .clickable(
-                    onClick = { expanded = true },
-                    role = Role.Button
-                )
-                .semantics {
-                    contentDescription = "Thinking ${selected ?: "auto"}, change thinking"
-                }
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    Icons.Filled.Psychology,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = selected ?: "auto",
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1
-                )
-            }
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("Default") },
-                onClick = { onSelect(null); expanded = false },
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-            )
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.replaceFirstChar { it.uppercase() }) },
-                    onClick = { onSelect(option); expanded = false },
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-                )
-            }
         }
     }
 }

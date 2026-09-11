@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -25,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,7 +59,7 @@ fun QuarkTopBar(
         ),
         navigationIcon = {
             IconButton(onClick = onMenu) {
-                Icon(Icons.Filled.Menu, contentDescription = "Open navigation drawer")
+                TwoLineMenuIcon(contentDescription = "Open navigation drawer")
             }
         },
         title = {
@@ -94,6 +101,38 @@ fun QuarkTopBar(
             )
         }
     )
+}
+
+// Two-line menu mark: Quark's drawer glyph (not the stock 3-line burger).
+@Composable
+fun TwoLineMenuIcon(
+    contentDescription: String?,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .size(48.dp)
+            .semantics { this.contentDescription = contentDescription; role = Role.Button },
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .width(22.dp)
+                .height(2.5.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurface)
+        )
+        Spacer(Modifier.height(5.dp))
+        Box(
+            modifier = Modifier
+                .width(14.dp)
+                .height(2.5.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurface)
+                .align(Alignment.CenterHorizontally)
+        )
+    }
 }
 
 // Context ring: determinate arc + % label, opens the Context stats sheet.

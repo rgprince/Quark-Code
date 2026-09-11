@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -58,6 +60,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -326,6 +329,8 @@ fun MessageList(
     }
 }
 
+// Thought line: italic text with a secondary color bar on the left.
+// Live: "thinking…". Done: "thought for 2.3s" + tap expands the reasoning.
 @Composable
 private fun ThoughtDoneRow(
     ms: Long,
@@ -339,20 +344,24 @@ private fun ThoughtDoneRow(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(enabled = text.isNotBlank(), onClick = onToggle)
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Psychology,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(14.dp)
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.secondary)
             )
             Text(
-                text = "Thought for ${formatDuration(ms)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "thought for ${formatDuration(ms)}",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontStyle = FontStyle.Italic
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
             )
             if (text.isNotBlank()) {
                 Icon(
@@ -368,9 +377,9 @@ private fun ThoughtDoneRow(
                 text = text,
                 style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 8,
+                maxLines = 10,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 24.dp, end = 8.dp, bottom = 4.dp)
+                modifier = Modifier.padding(start = 16.dp, end = 8.dp, bottom = 4.dp)
             )
         }
     }
@@ -382,26 +391,29 @@ private fun formatDuration(ms: Long): String =
 
 @Composable
 private fun ThinkingTail(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.semantics {
-            contentDescription = "Assistant is working"
-        },
-        shape = RoundedCornerShape(100.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .semantics { contentDescription = "Assistant is thinking" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-            Text(
-                text = "Thinking…",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(18.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.secondary)
+        )
+        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp)
+        Text(
+            text = "thinking…",
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontStyle = FontStyle.Italic
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

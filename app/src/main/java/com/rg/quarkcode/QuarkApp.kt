@@ -22,10 +22,10 @@ import com.rg.quarkcode.backend.ThemeMode
 import com.rg.quarkcode.backend.ThemeStore
 import com.rg.quarkcode.chat.ChatRoute
 import com.rg.quarkcode.chat.ChatScreen
+import com.rg.quarkcode.chat.UsageScreen
 import com.rg.quarkcode.chat.ChatViewModel
 import com.rg.quarkcode.chat.ReviewScreen
 import com.rg.quarkcode.settings.ProvidersScreen
-import com.rg.quarkcode.settings.ServerInfoScreen
 import com.rg.quarkcode.connect.ConnectScreen
 import com.rg.quarkcode.connect.ConnectViewModel
 import com.rg.quarkcode.drawer.QuarkDrawer
@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
 private data object ConnectRoute
 private data object SettingsRoute
 private data object ProvidersRoute
-private data object ServerInfoRoute
+private data object UsageRoute
 private data object SchedulesRoute
 private data object DiffRoute
 
@@ -222,7 +222,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onAutoSpeakChange = chatVm::setAutoSpeak,
                                 serverVersion = settingsVm.uiState.serverVersion,
                                 diagnosticsText = settingsVm.diagnosticsText(),
-                                onOpenServerInfo = { backStack.add(ServerInfoRoute) },
+                                onOpenUsage = { backStack.add(UsageRoute) },
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,
@@ -271,15 +271,15 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onCloseDialog = settingsVm::closeProviderDialog
                             )
                         }
-                        is ServerInfoRoute -> NavEntry(key) {
-                            ServerInfoScreen(
-                                state = settingsVm.uiState,
+                        is UsageRoute -> NavEntry(key) {
+                            UsageScreen(
+                                state = chatVm.usageState,
                                 onBack = { backStack.removeLastOrNull() },
-                                onOpen = settingsVm::loadServerInfoFull,
-                                onStartEdit = settingsVm::startEditConfig,
-                                onCancelEdit = settingsVm::cancelEditConfig,
-                                onDraftChange = settingsVm::onConfigDraftChange,
-                                onSave = settingsVm::saveConfig
+                                onRequestScan = chatVm::requestUsageScan,
+                                onDismissConfirm = chatVm::dismissUsageConfirm,
+                                onConfirmScan = chatVm::scanUsage,
+                                onCancelScan = chatVm::stopScan,
+                                onPeriodChange = chatVm::setUsagePeriod
                             )
                         }
                         else -> error("Unknown route: $key")

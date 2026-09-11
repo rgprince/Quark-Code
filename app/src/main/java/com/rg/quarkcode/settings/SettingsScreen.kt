@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AssistChip
@@ -91,7 +92,7 @@ fun SettingsScreen(
     onAutoSpeakChange: (Boolean) -> Unit,
     serverVersion: String?,
     diagnosticsText: String,
-    onOpenServerInfo: () -> Unit,
+    onOpenUsage: () -> Unit,
     onNewMcpNameChange: (String) -> Unit,
     onNewMcpUrlChange: (String) -> Unit,
     onAddMcp: () -> Unit,
@@ -421,13 +422,20 @@ fun SettingsScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable(onClick = onOpenServerInfo),
+                                    .clickable(onClick = onOpenUsage),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    Icons.Filled.PieChart,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(text = "Server info", style = MaterialTheme.typography.bodyMedium)
+                                    Text(text = "Usage stats", style = MaterialTheme.typography.bodyMedium)
                                     Text(
-                                        text = "Config, providers, commands, skills",
+                                        text = "Tokens by week, month and model, with cost",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
