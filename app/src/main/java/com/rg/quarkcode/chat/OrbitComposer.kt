@@ -58,8 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -210,7 +208,6 @@ fun OrbitComposer(
                         .padding(horizontal = 4.dp, vertical = 4.dp)
                         .semantics {
                             contentDescription = "Message input"
-                            role = Role.TextField
                         }
                 ) {
                     if (input.isEmpty()) {
