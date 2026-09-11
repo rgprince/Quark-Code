@@ -14,8 +14,8 @@ Backend: AndCode-ported client (URL rules, `GET /provider` catalog with
   the Termux `opencode` package (API >= 28), password via
   `OPENCODE_SERVER_PASSWORD`, app talks to `http://localhost:4096`.
 - Remote mode: same API over LAN/Tailscale URL (user-provided).
-- MCP: Streamable-HTTP `McpClient` (initialize → tools/list → call),
-  in-process, ~KBs per server. No node/bun/uvx children.
+- MCP: server-side via opencode's `/mcp` endpoint (Settings list/add/toggle).
+  Unused in-process `McpClient.kt` removed 2026-09-11 (see DEPENDENCY_TREE.md).
 
 ## V1 scope — DONE (build green 2026-09-10, `rgprince/Quark`, debug APK 65M)
 - [x] Connect screen (localhost default, Keystore password, test button)
@@ -91,3 +91,23 @@ DataStore, Coil. No KMP, no Electron, no PRoot, no WebView.
 
 ## Target size
 Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
+
+## V5 scope — full M3 Expressive redesign (single-push, CI minutes saved)
+- [x] Theme: 4-way Void/Paper/Dynamic/System (`ThemeMode.DYNAMIC`, dynamic
+  schemes on API 31+ with Void/Paper fallback, expressive shape scale)
+- [x] Edge-to-edge shell (`enableEdgeToEdge`, `adjustResize`, Scaffold
+  innerPadding → list contentPadding, composer IME-safe)
+- [x] Chat timeline: responsive bubbles (timestamp inside, selection),
+  markdown-lite (fenced code + copy, bold, inline code, headings),
+  expressive Activity/Reasoning/Tool/Patch/Error cards, 48dp footer,
+  LoadingIndicator thinking tail, permission/question entrances
+- [x] OrbitComposer rebuild: 32dp container, Assist/Filter chips,
+  56dp XL send↔stop morph, determinate meter, 48dp slash/@ menus
+- [x] TopBar: token-aware badge dot (no hardcoded colors), ring with semantics
+- [x] SpacesSheet deleted (drawer is the single recents source; VM flag kept
+  dormant for zero-logic-change); drawer FAB + hero copy
+- [x] Connect hero + quick-fill chips + XL action + error card; ContextSheet
+  progress + Export/Copy; ModelSheet ListItem rows
+- [x] Approved deps only (BOM 2025.09.01 kept): re-added window-size-class +
+  adaptive-navigation-suite with approved coordinates; no markdown/coil3 adds
+  (markdown-lite is dependency-free)

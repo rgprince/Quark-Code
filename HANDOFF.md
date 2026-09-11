@@ -16,7 +16,8 @@ Display name: **Quark Code** · Last verified build: ✅ green (Actions, `quark-
 - `backend/OpenCodeUrl.kt` — http only for loopback/LAN/Tailscale, https anywhere.
 - `backend/ModelStore.kt` — stored pick (`provider_id`/`model_id`), favorites,
   recents (cap 3, `prov/model` keys), AndCode reconcile priority.
-- `backend/McpClient.kt` — Kai-style Streamable-HTTP MCP (in-process, no children).
+- MCP is server-side (`/mcp` via ServeApi; unused in-process `McpClient.kt`
+  removed 2026-09-11, restorable from git).
 - `backend/ConnectionStore.kt`, `ThemeStore.kt` — connection + theme prefs.
 - Chat engine (`chat/ChatViewModel.kt` + `ChatParts.kt`): fire `prompt_async`
   (server-default agent; model only if both IDs valid) → delta streaming →

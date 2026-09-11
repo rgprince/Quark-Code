@@ -21,6 +21,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -282,38 +283,48 @@ private fun ModelRow(
     onFavoriteToggle: () -> Unit,
     onHiddenToggle: () -> Unit = {}
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onFavoriteToggle) {
-            Icon(
-                imageVector = if (favorite) Icons.Filled.Star else Icons.Filled.StarBorder,
-                contentDescription = "Favorite",
-                tint = MaterialTheme.colorScheme.primary
+    ListItem(
+        modifier = modifier,
+        headlineContent = {
+            Text(
+                text = model.label,
+                maxLines = 1,
+                color = if (hidden) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface
             )
-        }
-        Text(
-            text = model.label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (hidden) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        if (showHide) {
-            IconButton(onClick = onHiddenToggle) {
+        },
+        supportingContent = {
+            Text(
+                text = model.providerId.ifBlank { "server default" },
+                maxLines = 1
+            )
+        },
+        leadingContent = {
+            IconButton(onClick = onFavoriteToggle, modifier = Modifier.size(48.dp)) {
                 Icon(
-                    imageVector = if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = if (hidden) "Unhide" else "Hide",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = if (favorite) Icons.Filled.Star else Icons.Filled.StarBorder,
+                    contentDescription = if (favorite) "Unfavorite" else "Favorite",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
                 )
             }
+        },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (showHide) {
+                    IconButton(onClick = onHiddenToggle, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            imageVector = if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (hidden) "Unhide model" else "Hide model",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                if (!hidden) {
+                    RadioButton(selected = selected, onClick = onSelect)
+                }
+            }
         }
-        if (!hidden) {
-            RadioButton(
-                selected = selected,
-                onClick = onSelect
-            )
-        }
-    }
+    )
 }

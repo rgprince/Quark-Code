@@ -3,6 +3,7 @@ package com.rg.quarkcode.drawer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Difference
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rg.quarkcode.chat.RecentSession
 
-// Slim drawer: New chat, recents (open only), review, schedules, settings.
+// Expressive drawer: FAB new chat, recents (open only), review, schedules, settings.
 @Composable
 fun QuarkDrawer(
     recents: List<RecentSession>,
@@ -38,25 +40,35 @@ fun QuarkDrawer(
     onOpenSettings: () -> Unit
 ) {
     ModalDrawerSheet(
-        modifier = modifier.width(300.dp),
+        modifier = modifier.width(320.dp),
         drawerShape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = 6.dp)
+                .padding(vertical = 12.dp)
         ) {
             Text(
                 text = "Quark Code",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
             )
-            DrawerEntry(
-                label = "New chat",
+            Text(
+                text = "Native opencode, on your phone",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            ExtendedFloatingActionButton(
+                onClick = onNewChat,
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                onClick = onNewChat
+                text = { Text("New chat") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
             )
             if (recents.isNotEmpty()) {
                 DrawerHeader(title = "Recent chats")
@@ -69,8 +81,9 @@ fun QuarkDrawer(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             if (hasSession) {
                 DrawerEntry(
                     label = "Review changes",
@@ -100,8 +113,8 @@ private fun DrawerHeader(
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(horizontal = 24.dp, vertical = 12.dp)
     )
 }
 

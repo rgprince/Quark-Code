@@ -1,14 +1,23 @@
 package com.rg.quarkcode.theme
 
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.rg.quarkcode.backend.ThemeMode
 
 // Quark identity: deep "Void" dark + warm "Paper" light.
-// Deliberately NOT AndCode's flat dev-dark: indigo pulse accent + larger radii.
+// Expressive evolution: larger radii (sheets 28dp, composer 32dp),
+// tonal elevation, dynamic-color option on API 31+.
 private val VoidScheme = darkColorScheme(
     primary = Color(0xFF8AB4FF),
     onPrimary = Color(0xFF0B1B33),
@@ -61,14 +70,35 @@ private val PaperScheme = lightColorScheme(
     background = Color(0xFFFFFBF2)
 )
 
+// Expressive shape scale: M12 cards, L16 bubbles/images, L-inc 20 drawer,
+// XL28 dialogs/sheets, XXL32 composer.
+private val QuarkShapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(28.dp)
+)
+
 @Composable
 fun QuarkTheme(
     dark: Boolean? = null,
+    mode: ThemeMode? = null,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
     val systemDark = isSystemInDarkTheme()
+    val useDynamic = mode == ThemeMode.DYNAMIC &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val colorScheme = when {
+        useDynamic && (dark ?: systemDark) -> dynamicDarkColorScheme(context)
+        useDynamic -> dynamicLightColorScheme(context)
+        dark ?: systemDark -> VoidScheme
+        else -> PaperScheme
+    }
     MaterialTheme(
-        colorScheme = if (dark ?: systemDark) VoidScheme else PaperScheme,
+        colorScheme = colorScheme,
+        shapes = QuarkShapes,
         content = content
     )
 }

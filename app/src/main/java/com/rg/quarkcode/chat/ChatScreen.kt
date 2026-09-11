@@ -1,33 +1,44 @@
 package com.rg.quarkcode.chat
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     state: ChatUiState,
@@ -63,6 +74,7 @@ fun ChatScreen(
     onMenu: () -> Unit
 ) {
     val context = LocalContext.current
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val recognizerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -82,8 +94,7 @@ fun ChatScreen(
     ) { granted ->
         if (granted) launchRecognizer()
     }
-    // Auto-readout: speak the newest assistant text once the turn completes
-    // (gated on !sending so streaming deltas don't restart speech).
+    // Auto-readout: speak the newest assistant text once the turn completes.
     val lastAssistantText = remember(state.messages) {
         state.messages.lastOrNull { !it.isUser }?.text.orEmpty()
     }
@@ -93,44 +104,42 @@ fun ChatScreen(
         }
     }
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             QuarkTopBar(
                 project = state.project,
                 usedFraction = ringFraction(state.stats),
                 usedLabel = ringLabel(state.stats),
                 statusOk = state.connected,
+                scrollBehavior = scrollBehavior,
                 onMenu = onMenu,
-                onSpaces = { onSpacesSheet(true) },
+                onSpaces = onMenu,
                 onTokenClick = { onContextSheet(true) }
             )
-        }
+        },
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets.safeDrawing
+            .only(
+                androidx.compose.foundation.layout.WindowInsetsSides.Horizontal +
+                    androidx.compose.foundation.layout.WindowInsetsSides.Top
+            )
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 12.dp)
         ) {
             if (state.messages.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Say hi to start a native session",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                QuarkEmptyState(
+                    modifier = Modifier.weight(1f),
+                    onSuggestion = { onInputChange(it) }
+                )
             } else {
                 if (state.sessionTodos.isNotEmpty() && state.todosVisible) {
                     TodoCard(
                         todos = state.sessionTodos,
                         onToggle = null,
-                        onDismiss = onDismissTodos
+                        onDismiss = onDismissTodos,
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -140,6 +149,7 @@ fun ChatScreen(
                     thinking = state.thinking,
                     autoExpandReasoning = state.autoExpandReasoning,
                     speakingId = state.speakingId,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier.weight(1f),
                     onTogglePart = onTogglePart,
                     onToggleTodo = onToggleTodo,
@@ -151,7 +161,6 @@ fun ChatScreen(
                     onSpeak = onSpeak
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
             OrbitComposer(
                 input = state.input,
                 model = state.model,
@@ -187,9 +196,9 @@ fun ChatScreen(
                 onModeChange = onModeChange,
                 onVariantChange = onVariantChange,
                 onSlashSelect = onSlashSelect,
-                onAtSelect = onAtSelect
+                onAtSelect = onAtSelect,
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 
@@ -218,17 +227,6 @@ fun ChatScreen(
             onDismiss = { onModelSheet(false) }
         )
     }
-    if (state.spacesSheet) {
-        SpacesSheet(
-            agent = state.agent,
-            agents = listOf("Native opencode", "Remote server"),
-            projects = listOf(state.project),
-            recents = state.recents,
-            onAgentSelect = onAgentSelect,
-            onRecentSelect = onOpenSession,
-            onDismiss = { onSpacesSheet(false) }
-        )
-    }
     if (state.contextSheet) {
         ContextSheet(
             stats = state.stats,
@@ -236,6 +234,66 @@ fun ChatScreen(
             onDismiss = { onContextSheet(false) },
             onExport = { onContextSheet(false) }
         )
+    }
+}
+
+@Composable
+private fun QuarkEmptyState(
+    modifier: Modifier = Modifier,
+    onSuggestion: (String) -> Unit
+) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Code,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .height(96.dp)
+                    .fillMaxWidth()
+            )
+            Text(
+                text = "What should we build?",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Native session · pick a model, / for commands, @ for files",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AssistChip(
+                    onClick = { onSuggestion("/help ") },
+                    label = { Text("/help — what can you do?") }
+                )
+                AssistChip(
+                    onClick = { onSuggestion("Explain this repo ") },
+                    label = { Text("Explain this repo") }
+                )
+                AssistChip(
+                    onClick = { onSuggestion("Review my changes ") },
+                    label = { Text("Review my changes") }
+                )
+            }
+            FilledTonalButton(onClick = { onSuggestion("Say hi, start a native session ") }) {
+                Text("Start chatting")
+            }
+        }
     }
 }
 

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.themeDataStore by preferencesDataStore(name = "quark_theme")
 
-enum class ThemeMode { SYSTEM, DARK, LIGHT }
+enum class ThemeMode { SYSTEM, DARK, LIGHT, DYNAMIC }
 
 class ThemeStore(private val context: Context) {
 

@@ -55,7 +55,7 @@ fun QuarkApp(modifier: Modifier = Modifier) {
         ThemeMode.SYSTEM -> systemDark
     }
 
-    QuarkTheme(dark = dark) {
+    QuarkTheme(dark = dark, mode = themeMode) {
         QuarkNavHost(modifier = modifier)
     }
 }

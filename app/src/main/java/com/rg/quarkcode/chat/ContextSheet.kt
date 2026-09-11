@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -45,6 +50,19 @@ fun ContextSheet(
                 text = model,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            LinearProgressIndicator(
+                progress = {
+                    if (stats.limit <= 0L) 0f
+                    else (stats.used.toFloat() / stats.limit.toFloat()).coerceIn(0f, 1f)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = StrokeCap.Round
             )
             Spacer(modifier = Modifier.height(16.dp))
             Row(
@@ -89,11 +107,31 @@ fun ContextSheet(
                 )
             }
             Spacer(modifier = Modifier.height(20.dp))
-            OutlinedButton(
+            val clipboard = LocalClipboardManager.current
+            FilledTonalButton(
                 onClick = onExport,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
             ) {
                 Text("Export session")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    clipboard.setText(
+                        AnnotatedString(
+                            "Context ${formatCount(stats.used)}/${formatCount(stats.limit)} " +
+                                "(${usagePercent(stats)}) in ${formatCount(stats.input)} " +
+                                "out ${formatCount(stats.output)} cost ${formatCost(stats.cost)} · $model"
+                        )
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Text("Copy stats")
             }
             Spacer(modifier = Modifier.height(12.dp))
         }

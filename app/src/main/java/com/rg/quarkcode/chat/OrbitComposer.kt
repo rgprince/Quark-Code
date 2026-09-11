@@ -1,13 +1,9 @@
 package com.rg.quarkcode.chat
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,19 +26,26 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,18 +55,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
-// Orbit composer, opencode/and-code layout: bordered surface card, edge-to-edge
-// BasicTextField on top, action row pinned (model left, send hard-right),
-// mode/meter strip BELOW the box. Cost intentionally absent (Context sheet only).
+// Expressive orbit composer: 32dp container, Assist/Filter chips,
+// 56dp XL send morphing Send<->Stop, determinate meter, 48dp targets,
+// menu-style slash/@ popups, IME-safe.
 @Composable
 fun OrbitComposer(
     input: String,
@@ -91,6 +96,7 @@ fun OrbitComposer(
 ) {
     // Provider name stays out of the box: short model label only.
     val shortModel = model.substringAfter(" / ", model)
+    var focused by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -101,11 +107,12 @@ fun OrbitComposer(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 280.dp),
@@ -115,8 +122,9 @@ fun OrbitComposer(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 48.dp)
                                 .clickable { onSlashSelect(suggestion) }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -143,11 +151,12 @@ fun OrbitComposer(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 240.dp),
@@ -157,8 +166,9 @@ fun OrbitComposer(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 48.dp)
                                 .clickable { onAtSelect(file) }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -183,20 +193,29 @@ fun OrbitComposer(
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(
+                1.dp,
+                if (focused) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outlineVariant
+            ),
+            tonalElevation = if (focused) 2.dp else 1.dp
         ) {
-            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp, vertical = 4.dp)
+                        .semantics {
+                            contentDescription = "Message input"
+                            role = Role.TextField
+                        }
                 ) {
                     if (input.isEmpty()) {
                         Text(
-                            text = "Message…",
+                            text = "/ for commands, @ for files",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -204,9 +223,12 @@ fun OrbitComposer(
                     BasicTextField(
                         value = input,
                         onValueChange = onInputChange,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focused = it.isFocused }
+                            .focusable(),
                         minLines = 1,
-                        maxLines = 4,
+                        maxLines = 6,
                         textStyle = TextStyle(
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = MaterialTheme.typography.bodyLarge.fontSize,
@@ -215,63 +237,92 @@ fun OrbitComposer(
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
                     )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    ModelPill(label = shortModel, onClick = onModelClick)
+                    AssistChip(
+                        onClick = onModelClick,
+                        label = {
+                            Text(
+                                shortModel,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 200.dp)
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Filled.Verified,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Filled.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    )
                     Spacer(modifier = Modifier.weight(1f))
                     if (queuedCount > 0) {
-                        Surface(
-                            shape = RoundedCornerShape(100.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.semantics {
+                                contentDescription = "$queuedCount messages queued"
+                            }
                         ) {
                             Text(
                                 text = "Queued $queuedCount",
                                 style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                             )
                         }
                     }
                     if (!sending) {
-                        Surface(
-                            modifier = Modifier.size(38.dp),
-                            shape = RoundedCornerShape(19.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
+                        OutlinedIconButton(
+                            onClick = onMicClick,
+                            modifier = Modifier.size(48.dp)
                         ) {
-                            IconButton(onClick = onMicClick, modifier = Modifier.fillMaxSize()) {
-                                Icon(
-                                    Icons.Filled.Mic,
-                                    contentDescription = "Voice input",
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Icon(
+                                Icons.Filled.Mic,
+                                contentDescription = "Voice input",
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                     FilledIconButton(
-                        onClick = if (sending) onAbort else onSend,
+                        onClick = { if (sending) onAbort() else onSend() },
                         enabled = sending || input.isNotBlank(),
-                        modifier = Modifier.size(38.dp)
+                        modifier = Modifier
+                            .size(56.dp)
+                            .semantics {
+                                contentDescription = if (sending) "Stop generating" else "Send message"
+                            }
                     ) {
-                        Icon(
-                            imageVector = if (sending) Icons.Filled.Stop else Icons.AutoMirrored.Filled.Send,
-                            contentDescription = if (sending) "Stop" else "Send",
-                            modifier = Modifier.size(20.dp)
-                        )
+                        AnimatedContent(targetState = sending, label = "send-stop") { isSending ->
+                            Icon(
+                                imageVector = if (isSending) Icons.Filled.Stop else Icons.AutoMirrored.Filled.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ModeChip(modes = modes, selected = mode, onSelect = onModeChange)
             if (variants.isNotEmpty()) {
@@ -282,72 +333,17 @@ fun OrbitComposer(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            CompactMeter(fraction = meterFraction, label = meterLabel)
+            ExpressiveMeter(fraction = meterFraction, label = meterLabel)
         }
-        // Glow light below the editor: visible + pulsing while opencode works.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (sending) {
-                val transition = rememberInfiniteTransition(label = "glow")
-                val alpha by transition.animateFloat(
-                    initialValue = 0.35f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(900, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "glowAlpha"
-                )
-                Surface(
-                    modifier = Modifier
-                        .widthIn(max = 220.dp)
-                        .fillMaxWidth(0.55f)
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(100.dp))
-                        .alpha(alpha * 0.35f + 0.5f),
-                    shape = RoundedCornerShape(100.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    content = {}
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelPill(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .widthIn(max = 168.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(100.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            Icon(
-                Icons.Filled.ArrowDropDown,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp)
+        // Sending progress below the editor (replaces the faint glow bar).
+        if (sending) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, start = 24.dp, end = 24.dp)
+                    .height(4.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }
     }
@@ -363,35 +359,26 @@ private fun ModeChip(
     if (modes.isEmpty()) return
     var expanded by remember { mutableStateOf(false) }
     val label = selected?.takeIf { modes.contains(it) } ?: modes.firstOrNull() ?: "build"
+    val isSelected = selected != null
     Box(modifier = modifier) {
-        Surface(
-            modifier = Modifier
-                .widthIn(max = 92.dp)
-                .clickable(onClick = { expanded = true }),
-            shape = RoundedCornerShape(100.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(Icons.Filled.Shield, contentDescription = null, modifier = Modifier.size(14.dp))
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+        FilterChip(
+            selected = isSelected,
+            onClick = { expanded = true },
+            label = { Text(label, maxLines = 1) },
+            leadingIcon = {
+                Icon(
+                    if (isSelected) Icons.Filled.Check else Icons.Filled.Shield,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
                 )
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(14.dp))
             }
-        }
+        )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             modes.forEach { entry ->
                 DropdownMenuItem(
                     text = { Text(entry) },
-                    onClick = { onSelect(entry); expanded = false }
+                    onClick = { onSelect(entry); expanded = false },
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                 )
             }
         }
@@ -407,36 +394,32 @@ private fun ThinkingChip(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
-        Surface(
-            modifier = Modifier.clickable(onClick = { expanded = true }),
-            shape = RoundedCornerShape(100.dp),
-            color = if (selected != null) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (selected != null) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(Icons.Filled.Psychology, contentDescription = null, modifier = Modifier.size(14.dp))
-                Text(
-                    selected ?: "Thinking",
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1
-                )
-            }
-        }
+        FilterChip(
+            selected = selected != null,
+            onClick = { expanded = true },
+            label = { Text(selected ?: "Thinking auto", maxLines = 1) },
+            leadingIcon = {
+                Icon(Icons.Filled.Psychology, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+            trailingIcon = if (selected != null) {
+                {
+                    IconButton(onClick = { onSelect(null) }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Filled.Close, contentDescription = "Clear thinking mode", modifier = Modifier.size(16.dp))
+                    }
+                }
+            } else null
+        )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text("Default") },
-                onClick = { onSelect(null); expanded = false }
+                onClick = { onSelect(null); expanded = false },
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             )
             options.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(option.replaceFirstChar { it.uppercase() }) },
-                    onClick = { onSelect(option); expanded = false }
+                    onClick = { onSelect(option); expanded = false },
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                 )
             }
         }
@@ -444,7 +427,7 @@ private fun ThinkingChip(
 }
 
 @Composable
-private fun CompactMeter(
+private fun ExpressiveMeter(
     fraction: Float,
     label: String,
     modifier: Modifier = Modifier
@@ -455,22 +438,21 @@ private fun CompactMeter(
         else -> MaterialTheme.colorScheme.primary
     }
     Column(
-        modifier = modifier.padding(horizontal = 2.dp),
+        modifier = modifier
+            .padding(horizontal = 2.dp)
+            .semantics { contentDescription = "Context $label used" },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         LinearProgressIndicator(
             progress = { fraction.coerceIn(0f, 1f) },
-            modifier = Modifier.width(34.dp).height(3.dp),
+            modifier = Modifier.width(48.dp).height(4.dp),
             color = color,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt,
-            gapSize = 0.dp
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
