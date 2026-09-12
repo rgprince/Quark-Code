@@ -8,6 +8,8 @@
   - kotlinx-serialization-json 1.8.0
   - commons-compress 1.26.0 (Apache-2.0, user-approved 2026-09-12 —
     guest tar.xz/tar.gz extraction; same lib and-code uses)
+    - xz 1.9 (public-domain Unlicense, user-approved 2026-09-12 —
+      required codec for commons-compress XZ input)
 - AGP 9.3.2 (needs Gradle 9.5.0+, compileSdk 37, JDK 17, Jetifier OFF)
   - android-application
 - Compose BOM 2025.09.01 (needs AGP 9.0+, SDK 36+, Kotlin 2.3.0+)

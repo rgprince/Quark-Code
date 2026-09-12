@@ -105,6 +105,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp.core)
     implementation(libs.commons.compress)
+    implementation(libs.xz)
     implementation(libs.androidx.dataStore.preferences)
     implementation(libs.androidx.work.ktx)
     implementation(libs.coil.kt.compose)
