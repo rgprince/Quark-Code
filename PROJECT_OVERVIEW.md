@@ -196,6 +196,14 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V6.2 scope — thought-line revert + slim tools (user feedback)
+- [x] "Thought N time(s)" card removed; old italic thought-line back, now
+  tertiary with side bar, `Thought · 16ms` format just above the reply
+- [x] Every think phase recorded (800ms gate dropped) — fast thoughts show too
+- [x] Slim rows: activity row whole-row tap, 34dp buttons, 15dp icons;
+  tool output cap 120dp/6 lines; transcript gaps 8→6dp, bubble padding down
+- [x] v0.5.0 (code 5), same dummy key — `adb install -r` updates
+
 ## V6.1 scope — screenshot-driven fixes (drawer crash, real tokens, thinking UI)
 - [x] Drawer crash fixed (screenshot error verbatim): tolerant `ModelRef`
   (`"model": {}` no longer kills `GET session`; multi-casing keys, `""` defaults)

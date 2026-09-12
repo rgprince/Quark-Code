@@ -116,8 +116,8 @@ fun ChatScreen(
                     (part.status == ToolStatus.RUNNING || part.status == ToolStatus.PENDING)
             }
         }
-    // Think timer: how long the last thinking phase took, shown as a tiny
-    // "Thought for 2.3s" row once it ends. Purely UI-local, no backend cost.
+    // Think timer: how long the last thinking phase took, shown as an italic
+    // "Thought · 16ms" line above the reply. Purely UI-local, no backend cost.
     var thinkStart by remember { mutableStateOf<Long?>(null) }
     var lastThoughtMs by remember { mutableStateOf<Long?>(null) }
     var thoughtExpanded by remember { mutableStateOf(false) }
@@ -125,7 +125,7 @@ fun ChatScreen(
     LaunchedEffect(state.thinking) {
         if (state.thinking) {
             // New think phase: time it, but keep the previous thought line
-            // until a real (800ms+) one completes — no flicker, no vanishes.
+            // until this one completes — no flicker, no vanishes.
             thinkStart = System.currentTimeMillis()
             thoughtExpanded = false
             thinkingSecs = 0
@@ -134,12 +134,11 @@ fun ChatScreen(
                 thinkingSecs++
             }
         } else {
+            // Every completed phase is recorded, even 16ms ones — the line
+            // is tiny, so fast thoughts deserve their timestamp too.
             thinkStart?.let { started ->
-                val ms = System.currentTimeMillis() - started
-                if (ms >= 800L) {
-                    lastThoughtMs = ms
-                    thoughtExpanded = false
-                }
+                lastThoughtMs = (System.currentTimeMillis() - started).coerceAtLeast(0L)
+                thoughtExpanded = false
                 thinkStart = null
             }
             thinkingSecs = 0

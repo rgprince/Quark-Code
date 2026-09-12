@@ -59,7 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-// Compact activity row: 12dp radius, single line, split affordances.
+// Slim activity row: 10dp radius, single line, compact affordances.
 @Composable
 fun AssistantActivityRow(
     parts: List<ChatPart>,
@@ -76,21 +76,22 @@ fun AssistantActivityRow(
     }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = container,
         tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                .clickable(onClick = onToggle)
+                .padding(start = 10.dp, end = 2.dp, top = 1.dp, bottom = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             if (running) {
                 CircularProgressIndicator(
                     modifier = Modifier
-                        .size(18.dp)
+                        .size(15.dp)
                         .semantics { contentDescription = "Working" },
                     strokeWidth = 2.dp
                 )
@@ -103,7 +104,7 @@ fun AssistantActivityRow(
                     } else {
                         MaterialTheme.colorScheme.primary
                     },
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(15.dp)
                 )
             }
             Text(
@@ -115,22 +116,22 @@ fun AssistantActivityRow(
             )
             IconButton(
                 onClick = onToggle,
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(34.dp)
             ) {
                 Icon(
                     imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     contentDescription = if (expanded) "Collapse activity inline" else "Expand activity inline",
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(19.dp)
                 )
             }
             IconButton(
                 onClick = onOpenSheet,
-                modifier = Modifier.size(44.dp)
+                modifier = Modifier.size(34.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.OpenInFull,
                     contentDescription = "Open activity details",
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(15.dp)
                 )
             }
         }
@@ -218,7 +219,7 @@ fun QuarkToolCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -270,15 +271,15 @@ fun QuarkToolCard(
             }
             if (expanded) {
                 part.output?.takeIf { it.isNotBlank() }?.let { output ->
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = (if (part.outputTruncated) "…(truncated)\n" else "") + output,
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 8,
+                        maxLines = 6,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .heightIn(max = 160.dp)
+                            .heightIn(max = 120.dp)
                             .verticalScroll(rememberScrollState())
                     )
                 }
