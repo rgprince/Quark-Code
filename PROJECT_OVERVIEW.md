@@ -196,6 +196,20 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8 scope — official opencode in Debian guest (Hope retired)
+- [x] Hope transplant retired: official `opencode-linux-arm64` from
+  opencode-ai releases, updates track upstream (autoupdate disabled,
+  Check-for-update button re-runs the official flow)
+- [x] proot suite fetched at BUILD time into jniLibs (Termux packages,
+  pinned, legacy packaging so it extracts exec-able)
+- [x] Device tab split in three: 1 Debian system, 2 official opencode,
+  3 optional tools (git/node/gh/ripgrep/fzf via guest apt) — each with
+  staged progress (resolve → download → extract → configure)
+- [x] commons-compress 1.26.0 (Apache-2.0, user-approved) for tar.xz/tar.gz
+- [x] Guest workspace bound as /workspace (app-private); CA bundle seeded
+  from system; server log shared for the future terminal shell
+- [x] v0.10.0 (code 10), same dummy key — `adb install -r` updates
+
 ## V7 scope — on-device backend (lean APK, download-on-startup)
 - [x] APK stays ~4 MB: native Bionic opencode ELF (~180 MB) downloads on
   first opt-in (Settings → Device), resolved live from Hope2333 releases

@@ -6,6 +6,8 @@
   - KSP 2.3.4 (declared, unused — Room/Hilt later)
   - kotlinx-coroutines 1.10.1 (core + android)
   - kotlinx-serialization-json 1.8.0
+  - commons-compress 1.26.0 (Apache-2.0, user-approved 2026-09-12 —
+    guest tar.xz/tar.gz extraction; same lib and-code uses)
 - AGP 9.3.2 (needs Gradle 9.5.0+, compileSdk 37, JDK 17, Jetifier OFF)
   - android-application
 - Compose BOM 2025.09.01 (needs AGP 9.0+, SDK 36+, Kotlin 2.3.0+)

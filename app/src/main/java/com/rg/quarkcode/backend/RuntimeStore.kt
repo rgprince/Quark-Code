@@ -15,6 +15,8 @@ private val Context.runtimeDataStore by preferencesDataStore(name = "quark_runti
 data class RuntimePrefs(
     val backendEnabled: Boolean = false,
     val runtimeVersion: String? = null,
+    val debianVersion: String? = null,
+    val opencodeVersion: String? = null,
     val serverPassword: String = ""
 )
 
@@ -27,6 +29,8 @@ class RuntimeStore(private val context: Context) {
     private object Keys {
         val BACKEND_ENABLED = booleanPreferencesKey("backend_enabled")
         val RUNTIME_VERSION = stringPreferencesKey("runtime_version")
+        val DEBIAN_VERSION = stringPreferencesKey("debian_version")
+        val OPENCODE_VERSION = stringPreferencesKey("opencode_version")
         val SERVER_PASSWORD = stringPreferencesKey("server_password")
     }
 
@@ -34,6 +38,8 @@ class RuntimeStore(private val context: Context) {
         RuntimePrefs(
             backendEnabled = p[Keys.BACKEND_ENABLED] == true,
             runtimeVersion = p[Keys.RUNTIME_VERSION],
+            debianVersion = p[Keys.DEBIAN_VERSION],
+            opencodeVersion = p[Keys.OPENCODE_VERSION],
             serverPassword = p[Keys.SERVER_PASSWORD] ?: ""
         )
     }
@@ -45,6 +51,18 @@ class RuntimeStore(private val context: Context) {
     suspend fun setVersion(version: String?) {
         context.runtimeDataStore.edit {
             if (version == null) it.remove(Keys.RUNTIME_VERSION) else it[Keys.RUNTIME_VERSION] = version
+        }
+    }
+
+    suspend fun setDebianVersion(version: String?) {
+        context.runtimeDataStore.edit {
+            if (version == null) it.remove(Keys.DEBIAN_VERSION) else it[Keys.DEBIAN_VERSION] = version
+        }
+    }
+
+    suspend fun setOpencodeVersion(version: String?) {
+        context.runtimeDataStore.edit {
+            if (version == null) it.remove(Keys.OPENCODE_VERSION) else it[Keys.OPENCODE_VERSION] = version
         }
     }
 

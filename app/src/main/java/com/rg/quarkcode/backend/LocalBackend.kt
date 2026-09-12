@@ -14,12 +14,12 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * Supervisor for the on-device opencode server process.
+ * Supervisor for the on-device backend: official opencode `serve` running
+ * inside the Debian proot guest.
  *
- * Lives as a process-wide singleton (so the future terminal shell can attach
- * to the same handle/logs) — the foreground service is just its keeper.
- * Transport matches the existing client: `serve --port 4096` on loopback
- * with basic auth, so ChatViewModel talks to it like any other backend.
+ * Process-wide singleton (the future terminal shell attaches to the same
+ * handle/logs) — the foreground service is just its keeper. Transport
+ * matches the existing client: loopback 4096 + basic auth.
  */
 object LocalBackend {
 
@@ -48,15 +48,48 @@ object LocalBackend {
         false
     }
 
+    /** Ready when the Debian guest AND the official opencode binary exist. */
+    fun isInstalled(context: Context): Boolean =
+        DebianInstaller.isInstalled(context) && GuestOpencode.isInstalled(context)
+
     fun appendLog(line: String) {
         val clean = line.take(500)
         if (clean.isBlank()) return
-        val next = (_logs.value + clean).takeLast(200)
-        _logs.value = next
+        _logs.value = (_logs.value + clean).takeLast(200)
+    }
+
+    private fun guestBase(context: Context, suite: ProotSuite.Paths): ArrayList<String> {
+        val guest = RuntimeFiles.guest(context)
+        return arrayListOf(
+            suite.proot.absolutePath,
+            "-0",
+            "--kill-on-exit",
+            "--link2symlink",
+            "--sysvipc",
+            "-r", guest.absolutePath,
+            "-w", "/workspace",
+            "-b", "${RuntimeFiles.workspace(context).absolutePath}:/workspace"
+        )
+    }
+
+    private fun guestEnv(
+        context: Context,
+        suite: ProotSuite.Paths,
+        password: String
+    ): Map<String, String> {
+        val env = HashMap(suite.baseEnv())
+        env["HOME"] = "/root"
+        env["PATH"] = "/root/.opencode/bin:/usr/local/bin:/usr/bin:/bin"
+        env["TERM"] = "dumb"
+        env["LANG"] = "C.UTF-8"
+        env["OPENCODE_SERVER_PASSWORD"] = password
+        env["OPENCODE_DISABLE_AUTOUPDATE"] = "true"
+        env.remove("TMPDIR")
+        return env
     }
 
     /**
-     * Starts `serve` through the system linker and waits for /global/health.
+     * Starts official `opencode serve` in the guest, waits for /global/health.
      * Returns true once the server answers (callers may then attach).
      */
     suspend fun start(context: Context): Boolean = withContext(Dispatchers.IO) {
@@ -74,33 +107,33 @@ object LocalBackend {
                 _state.value = State.Stopped("Only arm64 devices are supported for now")
                 return@withContext false
             }
-            val elf = RuntimeFiles.elf(context)
-            if (!RuntimeFiles.isPresent(context)) {
-                _state.value = State.Stopped("Runtime not downloaded — open Settings → Device")
+            val suite = runCatching {
+                ProotSuite(context, RuntimeFiles.root(context)).ensureInstalled()
+            }.getOrElse { err ->
+                _state.value = State.Stopped(err.message?.take(200) ?: "proot suite missing")
+                return@withContext false
+            }
+            if (!DebianInstaller.isInstalled(context)) {
+                _state.value = State.Stopped("Debian not downloaded — open Settings → Device")
+                return@withContext false
+            }
+            if (!GuestOpencode.isInstalled(context)) {
+                _state.value = State.Stopped("opencode not downloaded — open Settings → Device")
                 return@withContext false
             }
             RuntimeFiles.ensureDirs(context)
             val store = RuntimeStore(context.applicationContext)
             val password = store.password()
-            val home = RuntimeFiles.home(context)
-            val workspace = RuntimeFiles.workspace(context)
-            val pb = ProcessBuilder(
-                RuntimeFiles.linker(),
-                elf.absolutePath,
-                "serve",
-                "--port", PORT.toString(),
-                "--hostname", "127.0.0.1"
-            )
-            pb.directory(workspace)
+            val cmd = guestBase(context, suite)
+            cmd.addAll(listOf(GuestOpencode.GUEST_BIN, "serve", "--port", PORT.toString(), "--hostname", "127.0.0.1"))
+            val pb = ProcessBuilder(cmd)
+            pb.directory(RuntimeFiles.workspace(context))
             pb.redirectErrorStream(true)
             val env = pb.environment()
-            env["HOME"] = home.absolutePath
-            env["TMPDIR"] = home.resolve("tmp").absolutePath
-            env["PATH"] = "/system/bin:/vendor/bin"
-            env["TERM"] = "dumb"
-            env["OPENCODE_SERVER_PASSWORD"] = password
+            env.clear()
+            env.putAll(guestEnv(context, suite, password))
             _state.value = State.Starting
-            appendLog("$ opencode serve --port $PORT (local device backend)")
+            appendLog("$ opencode serve --port $PORT (official, Debian guest)")
             val proc = pb.start()
             process = proc
             thread(isDaemon = true, name = "opencode-log") {
@@ -109,20 +142,20 @@ object LocalBackend {
                 } catch (_: Exception) {
                 }
             }
-            val version = runCatching { store.prefs.first().runtimeVersion }.getOrNull()
-            repeat(45) {
+            val version = runCatching { store.prefs.first().opencodeVersion }.getOrNull()
+            repeat(60) {
                 delay(1000L)
                 if (!isAlive()) {
                     _state.value = State.Stopped("Server process died during startup — see logs")
                     return@withContext false
                 }
                 if (checkHealth(password)) {
-                    _state.value = State.Running(version ?: "local")
+                    _state.value = State.Running(version ?: "official")
                     appendLog("✓ backend answering on 127.0.0.1:$PORT")
                     return@withContext true
                 }
             }
-            _state.value = State.Stopped("Backend did not answer in 45s — see logs")
+            _state.value = State.Stopped("Backend did not answer in 60s — see logs")
             return@withContext false
         } catch (e: Exception) {
             _state.value = State.Stopped(e.message?.take(200) ?: "Could not start backend")
@@ -130,6 +163,47 @@ object LocalBackend {
         } finally {
             starting = false
         }
+    }
+
+    /** One-shot guest command (apt, dpkg-query, …) for the tools menu. */
+    suspend fun runGuest(
+        context: Context,
+        args: List<String>,
+        timeoutMs: Long = 180_000L
+    ): GuestCmdResult = withContext(Dispatchers.IO) {
+        val suite = ProotSuite(context, RuntimeFiles.root(context)).ensureInstalled()
+        val store = RuntimeStore(context.applicationContext)
+        val cmd = guestBase(context, suite)
+        cmd.addAll(args)
+        val pb = ProcessBuilder(cmd)
+        pb.directory(RuntimeFiles.workspace(context))
+        pb.redirectErrorStream(true)
+        val env = pb.environment()
+        env.clear()
+        env.putAll(guestEnv(context, suite, store.password()))
+        val proc = pb.start()
+        val out = StringBuilder()
+        val reader = thread(isDaemon = true, name = "guest-cmd") {
+            try {
+                proc.inputStream.bufferedReader().forEachLine { line ->
+                    synchronized(out) { out.appendLine(line.take(500)) }
+                }
+            } catch (_: Exception) {
+            }
+        }
+        val finished = try {
+            proc.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (_: Exception) {
+            false
+        }
+        if (!finished) {
+            runCatching { proc.destroyForcibly() }
+        }
+        reader.join(3000L)
+        GuestCmdResult(
+            code = if (finished) proc.exitValue() else 124,
+            output = out.toString().takeLast(8000)
+        )
     }
 
     fun stop() {
@@ -144,10 +218,6 @@ object LocalBackend {
         process = null
         _state.value = State.Idle
         appendLog("■ backend stopped")
-    }
-
-    suspend fun healthNow(password: String): Boolean = withContext(Dispatchers.IO) {
-        checkHealth(password)
     }
 
     private val healthHttp = OkHttpClient.Builder()

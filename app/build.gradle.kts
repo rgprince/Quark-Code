@@ -12,8 +12,8 @@ android {
         applicationId = "com.rg.quarkcode"
         minSdk = 28
         targetSdk = 37
-        versionCode = 9
-        versionName = "0.9.0"
+        versionCode = 10
+        versionName = "0.10.0"
     }
 
     signingConfigs {
@@ -48,6 +48,37 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    packaging {
+        // proot MUST live on disk in nativeLibraryDir to be exec-able (W^X
+        // blocks exec from anywhere else). Legacy packaging forces extraction.
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDir(layout.buildDirectory.dir("generated/proot-jnilibs/arm64-v8a"))
+        }
+    }
+}
+
+// Build-time fetch of the proot launcher suite from Termux packages
+// (proot + guest loaders + talloc/shmem). Small, pinned, reviewable — the
+// big pieces (Debian rootfs, opencode) still download at runtime on opt-in.
+val fetchProotAssets by tasks.registering(Exec::class) {
+    val outDir = layout.buildDirectory.dir("generated/proot-jnilibs/arm64-v8a")
+    commandLine(
+        "python3",
+        rootProject.file("scripts/fetch_proot_assets.py").absolutePath,
+        "--out", outDir.get().asFile.absolutePath
+    )
+    outputs.dir(outDir)
+}
+
+afterEvaluate {
+    tasks.named("preBuild").configure { dependsOn(fetchProotAssets) }
 }
 
 dependencies {
@@ -69,6 +100,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp.core)
+    implementation(libs.commons.compress)
     implementation(libs.androidx.dataStore.preferences)
     implementation(libs.androidx.work.ktx)
     implementation(libs.coil.kt.compose)
