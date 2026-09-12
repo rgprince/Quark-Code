@@ -55,6 +55,7 @@ import com.rg.quarkcode.backend.ThemeMode
 
 private enum class SettingsTab(val label: String) {
     CONNECTION("Connection"),
+    DEVICE("Device"),
     APPEARANCE("Look"),
     CHAT("Chat"),
     MCP("MCP"),
@@ -216,8 +217,14 @@ fun SettingsScreen(
                         }
                     }
                 }
-                SettingsTab.APPEARANCE -> {
-                    item(key = "appearance") {
+                SettingsTab.DEVICE -> {
+                    item(key = "device") {
+                        SettingsSection(title = "On-device backend", icon = Icons.Filled.Storage) {
+                            DeviceBackendPanel()
+                        }
+                    }
+                }
+                SettingsTab.APPEARANCE -> {                    item(key = "appearance") {
                         SettingsSection(title = "Appearance", icon = Icons.Filled.Palette) {
                             Text(
                                 text = "Void is dark, Paper is light, Dynamic follows your wallpaper (Android 12+).",

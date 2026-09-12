@@ -196,6 +196,21 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V7 scope — on-device backend (lean APK, download-on-startup)
+- [x] APK stays ~4 MB: native Bionic opencode ELF (~180 MB) downloads on
+  first opt-in (Settings → Device), resolved live from Hope2333 releases
+  (no hardcoded version), Wi-Fi warning + progress + cancel
+- [x] `LocalBackend` singleton supervises `serve` via `/system/bin/linker64`
+  (W^X escape hatch, no proot/glibc/root); arm64 only for now
+- [x] Foreground keeper service (dataSync) with Stop action; health-gated
+  start; 200-line log ring for the future terminal shell to attach to
+- [x] Launch auto-starts local backend when enabled+present, attaches
+  loopback; falls back to saved remote otherwise
+- [x] Tools V1 = system toybox/sh via PATH (no downloads); git/node/LSP absent
+  and fail gracefully — agent workspace is app-private (`files/backend/…`)
+- [x] GPL-3 accepted for now, isolated files, relicense plan in RUNTIME_NOTICES.md
+- [x] v0.9.0 (code 9), same dummy key — `adb install -r` updates
+
 ## V6.5 scope — QoL batch (links, per-chat model, instant cache, simpler settings)
 - [x] Links get primary colour (underlined + medium)
 - [x] Per-chat model memory: opening a chat adopts its backend-tagged model

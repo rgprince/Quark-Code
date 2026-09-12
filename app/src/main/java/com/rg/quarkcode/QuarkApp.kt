@@ -20,6 +20,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.rg.quarkcode.backend.ConnectionStore
+import com.rg.quarkcode.backend.LocalBackend
+import com.rg.quarkcode.backend.QuarkBackendService
+import com.rg.quarkcode.backend.RuntimeFiles
+import com.rg.quarkcode.backend.RuntimeStore
 import com.rg.quarkcode.backend.ThemeMode
 import com.rg.quarkcode.backend.ThemeStore
 import com.rg.quarkcode.chat.ChatRoute
@@ -35,6 +39,7 @@ import com.rg.quarkcode.settings.SettingsScreen
 import com.rg.quarkcode.settings.SettingsViewModel
 import com.rg.quarkcode.theme.QuarkTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,8 +80,34 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
     val settingsVm: SettingsViewModel = viewModel()
 
     LaunchedEffect(Unit) {
+        val appCtx = context.applicationContext
+        // On-device backend wins when enabled and downloaded: start the
+        // keeper, wait for health, attach loopback. Falls through to the
+        // saved remote backend when local isn't available.
+        val runtime = runCatching {
+            withContext(Dispatchers.IO) { RuntimeStore(appCtx).prefs.first() }
+        }.getOrNull()
+        if (runtime?.backendEnabled == true && RuntimeFiles.isPresent(appCtx)) {
+            QuarkBackendService.start(appCtx)
+            val ok = withContext(Dispatchers.IO) {
+                repeat(50) {
+                    if (LocalBackend.state.value is LocalBackend.State.Running) return@withContext true
+                    delay(1000L)
+                }
+                LocalBackend.state.value is LocalBackend.State.Running
+            }
+            if (ok) {
+                val pw = runCatching {
+                    withContext(Dispatchers.IO) { RuntimeStore(appCtx).password() }
+                }.getOrNull().orEmpty()
+                if (!chatVm.uiState.connected) {
+                    chatVm.attach("http://127.0.0.1:4096", LocalBackend.USERNAME, pw)
+                }
+                return@LaunchedEffect
+            }
+        }
         val saved = runCatching {
-            withContext(Dispatchers.IO) { ConnectionStore(context.applicationContext).connection.first() }
+            withContext(Dispatchers.IO) { ConnectionStore(appCtx).connection.first() }
         }.getOrNull()
         if (saved != null && !chatVm.uiState.connected) {
             chatVm.attach(saved.host, saved.username, saved.password)
