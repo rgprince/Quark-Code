@@ -130,6 +130,10 @@ data class ChatUiState(
     val stats: ContextStats = ContextStats(),
     val sending: Boolean = false,
     val thinking: Boolean = false,
+    // True from send until the first assistant content lands (or the turn
+    // ends). Survives early idle/thinking clears so the glow, stop button
+    // and status never pretend the model stopped mid-turn.
+    val awaitingReply: Boolean = false,
     val expandedParts: Set<String> = emptySet(),
     val modelSheet: Boolean = false,
     val spacesSheet: Boolean = false,

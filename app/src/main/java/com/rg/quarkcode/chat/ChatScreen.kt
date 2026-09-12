@@ -107,9 +107,10 @@ fun ChatScreen(
         }
     }
     // Busy = sending flags OR live work the flags can lag behind (streaming
-    // deltas, running tools). The stop button and progress follow this, so a
-    // stale idle event can never flip us back to send-arrow mid-reply.
-    val busy = state.sending || state.thinking ||
+    // deltas, running tools) OR a sent prompt with no reply content yet. The
+    // stop button, glow and progress follow this, so an early idle event can
+    // never flip us back to send-arrow mid-reply.
+    val busy = state.sending || state.thinking || state.awaitingReply ||
         state.messages.any { message ->
             message.isStreaming || message.parts.any { part ->
                 part is ChatPart.Tool &&
@@ -191,6 +192,7 @@ fun ChatScreen(
                     expandedParts = state.expandedParts,
                     thinking = state.thinking,
                     busy = busy,
+                    awaitingReply = state.awaitingReply,
                     thinkingSecs = thinkingSecs,
                     speakingId = state.speakingId,
                     thoughtMs = lastThoughtMs,

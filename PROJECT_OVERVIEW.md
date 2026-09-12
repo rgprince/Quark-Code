@@ -196,6 +196,16 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V6.4 scope — links, no-more-fake-idle, cooking bubble
+- [x] Links tappable: `[text](url)` was annotated but never consumed; now
+  `ClickableText` + `LocalUriHandler`, plus bare-URL auto-linking
+- [x] Fake-idle killed: new `awaitingReply` survives early idle/thinking
+  clears; stale idle ignored while the prompt has no reply; fresh-only
+  answer detection (history no longer ends turn 2+ instantly)
+- [x] Cooking bubble: rotating Cooking/Doodling/Crafting… assistant bubble
+  fills the pre-reply gap, replaced by real content on arrival
+- [x] v0.7.0 (code 7), same dummy key — `adb install -r` updates
+
 ## V6.3 scope — thought fallback, chat-name bar, plain tool words, flat todos
 - [x] Thought line actually appears now: falls back to transcript reasoning
   (old chats never run the live timer) — `Thought` without time when no

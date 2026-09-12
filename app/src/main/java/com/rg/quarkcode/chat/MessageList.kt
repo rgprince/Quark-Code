@@ -71,6 +71,7 @@ fun MessageList(
     expandedParts: Set<String>,
     thinking: Boolean,
     busy: Boolean = false,
+    awaitingReply: Boolean = false,
     thinkingSecs: Int = 0,
     speakingId: String?,
     thoughtMs: Long? = null,
@@ -293,11 +294,19 @@ fun MessageList(
             }
         }
         // Live status lives at the transcript tail, never above the composer.
-        // Derived from busy (like the stop button), not just the `thinking`
-        // flag, so a long pre-tool reasoning phase with no activity row yet
-        // still shows "thinking… Ns" instead of a dead gap. Suppressed only
+        // While the prompt has NO reply content at all, a playful cooking
+        // bubble keeps the illusion of work (words rotate automatically and
+        // it is replaced the moment real content streams in). Otherwise the
+        // thinking tail shows, derived from busy so a long pre-tool phase
+        // with no activity row yet never looks dead. Both are suppressed
         // while a running activity row already shows progress.
-        if ((thinking || busy) && !hasRunningActivity) {
+        val lastIsUser = messages.lastOrNull()?.isUser == true
+        val showCooking = awaitingReply && lastIsUser
+        if (showCooking) {
+            item(key = "cooking-bubble") {
+                CookingBubble(modifier = Modifier.animateItem())
+            }
+        } else if ((thinking || busy) && !hasRunningActivity) {
             item(key = "thinking-tail") {
                 ThinkingTail(
                     seconds = thinkingSecs,
@@ -405,9 +414,52 @@ private fun formatDuration(ms: Long): String =
     if (ms < 1000L) "${ms.coerceAtLeast(0L)}ms"
     else "%.1fs".format(ms / 1000f)
 
+// Playful pre-reply bubble: while the sent prompt has no reply content yet,
+// shows a soft assistant-style bubble cycling "Cooking… / Doodling… / …"
+// every ~1.4s. Pure illusion-of-work; vanishes the moment real content lands.
 @Composable
-private fun ThinkingTail(
-    seconds: Int = 0,
+private fun CookingBubble(
+    modifier: Modifier = Modifier
+) {
+    val words = remember {
+        listOf("Cooking", "Doodling", "Crafting", "Brewing", "Stirring", "Sketching", "Simmering", "Polishing")
+    }
+    var index by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1400L)
+            index = (index + 1) % words.size
+        }
+    }
+    Row(modifier = modifier.fillMaxWidth()) {
+        Surface(
+            shape = RoundedCornerShape(
+                topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp
+            ),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 1.dp,
+            modifier = Modifier.semantics { contentDescription = "Assistant is ${words[index]}" }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(13.dp), strokeWidth = 2.dp)
+                Text(
+                    text = "${words[index]}…",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontStyle = FontStyle.Italic
+                    ),
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThinkingTail(    seconds: Int = 0,
     modifier: Modifier = Modifier
 ) {
     Row(

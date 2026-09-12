@@ -437,6 +437,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             input = "",
             sending = true,
             thinking = true,
+            awaitingReply = true,
             messages = uiState.messages + userMessage
         )
         pollJob = viewModelScope.launch {
@@ -453,7 +454,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 client.postUnit("session/${client.encodePath(id)}/command", body)
                 pollUntilDone(client, id, idsBeforeSend)
                 withContext(Dispatchers.Main) {
-                    uiState = uiState.copy(sending = false, thinking = false)
+                    uiState = uiState.copy(sending = false, thinking = false, awaitingReply = false)
                 }
                 refreshCost(id)
                 refreshTodos()
@@ -464,6 +465,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 uiState = uiState.copy(
                     sending = false,
                     thinking = false,
+                    awaitingReply = false,
                     messages = uiState.messages + ChatMessage(
                         id = UUID.randomUUID().toString(),
                         isUser = false,
@@ -537,6 +539,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         uiState = uiState.copy(
             sending = true,
             thinking = false,
+            awaitingReply = false,
             messages = emptyList(),
             sessionTodos = emptyList(),
             todosVisible = true,
@@ -588,8 +591,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         // Busy: queue behind the running turn, or interrupt it.
-        // (sending alone is not enough: flags can lag behind streaming/tools.)
-        if (uiState.sending || hasRunningWork()) {
+        // (flags alone can lag behind streaming/tools/awaiting.)
+        if (uiState.sending || uiState.awaitingReply || hasRunningWork()) {
             if (uiState.sendBehavior == "queue") {
                 messageQueue.add(text)
                 uiState = uiState.copy(input = "")
@@ -603,7 +606,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun retry(messageId: String) {
-        if (uiState.sending) return
+        if (uiState.sending || uiState.awaitingReply) return
         val failed = uiState.messages.firstOrNull { it.id == messageId } ?: return
         val text = uiState.messages
             .takeWhile { it.id != messageId }
@@ -633,6 +636,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             input = "",
             sending = true,
             thinking = true,
+            awaitingReply = true,
             messages = uiState.messages.filterNot { message ->
                 message.parts.filterIsInstance<ChatPart.Error>().isNotEmpty() && !message.isUser
             } + userMessage,
@@ -675,7 +679,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 client.postUnit("session/${client.encodePath(id)}/prompt_async", body)
                 pollUntilDone(client, id, idsBeforeSend)
                 withContext(Dispatchers.Main) {
-                    uiState = uiState.copy(sending = false, thinking = false)
+                    uiState = uiState.copy(sending = false, thinking = false, awaitingReply = false)
                 }
                 refreshCost(id)
                 refreshTodos()
@@ -693,6 +697,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 uiState = uiState.copy(
                     sending = false,
                     thinking = false,
+                    awaitingReply = false,
                     messages = uiState.messages + assistant
                 )
             }
@@ -738,7 +743,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     mapped.forEach { lastSeenIds.add(it.id) }
                     if (turnFinished(serverMessages, idsBeforeSend)) {
-                        uiState = uiState.copy(sending = false, thinking = false)
+                        uiState = uiState.copy(sending = false, thinking = false, awaitingReply = false)
                     }
                 }
             }
@@ -756,10 +761,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     uiState = uiState.copy(
                         messages = mergeReloadedMessages(mapped, uiState.messages, retained),
                         sending = false,
-                        thinking = false
+                        thinking = false,
+                        awaitingReply = false
                     )
                 } else {
-                    uiState = uiState.copy(sending = false, thinking = false)
+                    uiState = uiState.copy(sending = false, thinking = false, awaitingReply = false)
                 }
                 mapped.forEach { lastSeenIds.add(it.id) }
             }
@@ -776,7 +782,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     JsonObject(emptyMap())
                 )
             }
-            uiState = uiState.copy(sending = false, thinking = false)
+            uiState = uiState.copy(sending = false, thinking = false, awaitingReply = false)
             refreshTodos()
         }
     }
@@ -788,6 +794,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         uiState = uiState.copy(
             sending = false,
             thinking = false,
+            awaitingReply = false,
             messages = emptyList(),
             sessionTodos = emptyList(),
             todosVisible = true,
@@ -955,6 +962,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 uiState = uiState.copy(
                     sending = false,
                     thinking = false,
+                    awaitingReply = false,
                     messages = uiState.messages + ChatMessage(
                         id = "perm-${ask.id}",
                         isUser = false,
@@ -983,6 +991,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // Displayed with answer buttons (QuestionCard); replies go to
                 // POST question/{id}/reply.
                 uiState = uiState.copy(
+                    awaitingReply = false,
                     messages = uiState.messages + ChatMessage(
                         id = "q-${event.ask.id}",
                         isUser = false,
@@ -1009,6 +1018,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (errorSession != id) return
                 if (System.currentTimeMillis() < ignoreIdleUntil && error == null) return
+                // Stale idle from an earlier turn must not end the new one:
+                // while we still await the first reply content, idle only
+                // means "nothing yet", not "finished".
+                if (error == null && uiState.awaitingReply &&
+                    uiState.messages.lastOrNull()?.isUser == true
+                ) return
                 if (error != null && !error.isAbort && error.message != null) {
                     uiState = uiState.copy(
                         messages = uiState.messages + ChatMessage(
@@ -1030,6 +1045,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (event.sessionId != id) return
                 if (event.status == "idle") {
                     if (System.currentTimeMillis() < ignoreIdleUntil) return
+                    if (uiState.awaitingReply &&
+                        uiState.messages.lastOrNull()?.isUser == true
+                    ) return
                     uiState = uiState.copy(sending = false, thinking = false)
                     refreshMessages()
                     refreshTodos()
@@ -1060,7 +1078,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     parts = listOf(part),
                     isStreaming = true
                 ),
-                thinking = if (hasContent) false else uiState.thinking
+                thinking = if (hasContent) false else uiState.thinking,
+                awaitingReply = if (hasContent) false else uiState.awaitingReply
             )
         } else {
             val message = current[index]
@@ -1075,7 +1094,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             uiState = uiState.copy(
                 messages = current.toMutableList().also { it[index] = updated },
-                thinking = if (hasContent) false else uiState.thinking
+                thinking = if (hasContent) false else uiState.thinking,
+                awaitingReply = if (hasContent) false else uiState.awaitingReply
             )
         }
     }
@@ -1087,7 +1107,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val mapped = list.mapNotNull { it.toUiMessage() }
             val fresh = mapped.filter { lastSeenIds.add(it.id) }
             val added = fresh.sumOf { estimateTokens(it.text) }
-            val answered = mapped.any { message ->
+            // Only FRESH answers clear thinking: history always contains old
+            // assistant text, so checking the whole transcript killed the
+            // indicator on turn 2+ the moment the first poll landed.
+            val answered = fresh.any { message ->
                 !message.isUser && message.parts.any { part ->
                     (part is ChatPart.Text && part.text.isNotBlank()) || part is ChatPart.Tool
                 }
@@ -1095,6 +1118,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(
                 messages = mergeReloadedMessages(mapped, uiState.messages, streamedParts.keys.toSet()),
                 thinking = if (answered) false else uiState.thinking,
+                awaitingReply = if (answered) false else uiState.awaitingReply,
                 stats = uiState.stats.copy(
                     used = uiState.stats.used + added,
                     output = uiState.stats.output + added

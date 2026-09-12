@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -36,9 +37,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -177,13 +183,14 @@ private fun parseRichText(src: String): List<RichBlock> {
 }
 
 private val inlinePattern = Regex("""(`(.+?)`)|(\*\*(.+?)\*\*)|(~~(.+?)~~)|(\[([^\]]+)\]\(([^)]+)\))|(\*([^*\n]+?)\*)""")
+private val bareUrlPattern = Regex("""https?://[^\s)>\]]+""")
 
 private fun renderRichInline(text: String): AnnotatedString {
     return buildAnnotatedString {
         var rest = text
         while (rest.isNotEmpty()) {
             val m = inlinePattern.find(rest) ?: break
-            append(rest.substring(0, m.range.first))
+            appendLinkified(rest.substring(0, m.range.first))
             val code = m.groups[2]?.value
             val bold = m.groups[4]?.value
             val strike = m.groups[6]?.value
@@ -201,15 +208,7 @@ private fun renderRichInline(text: String): AnnotatedString {
                     SpanStyle(textDecoration = TextDecoration.LineThrough)
                 ) { append(strike) }
                 linkText != null -> {
-                    pushStringAnnotation("url", linkHref.orEmpty())
-                    withStyle(
-                        SpanStyle(
-                            color = androidx.compose.ui.graphics.Color.Unspecified,
-                            textDecoration = TextDecoration.Underline,
-                            fontWeight = FontWeight.Medium
-                        )
-                    ) { append(linkText) }
-                    pop()
+                    appendLink(linkText, linkHref.orEmpty())
                 }
                 italic != null -> withStyle(
                     SpanStyle(fontStyle = FontStyle.Italic)
@@ -217,7 +216,87 @@ private fun renderRichInline(text: String): AnnotatedString {
             }
             rest = rest.substring(m.range.last + 1)
         }
-        append(rest)
+        appendLinkified(rest)
+    }
+}
+
+private fun AnnotatedString.Builder.appendLink(text: String, href: String) {
+    val url = href.trim()
+    if (url.isEmpty()) {
+        append(text)
+        return
+    }
+    pushStringAnnotation("url", url)
+    withStyle(
+        SpanStyle(
+            textDecoration = TextDecoration.Underline,
+            fontWeight = FontWeight.Medium
+        )
+    ) { append(text) }
+    pop()
+}
+
+/** Auto-links bare https:// URLs inside plain runs (trailing punctuation trimmed). */
+private fun AnnotatedString.Builder.appendLinkified(text: String) {
+    var rest = text
+    while (rest.isNotEmpty()) {
+        val m = bareUrlPattern.find(rest) ?: break
+        append(rest.substring(0, m.range.first))
+        var url = m.value
+        while (url.isNotEmpty() && url.last() in ".,;:!?") url = url.dropLast(1)
+        val trailing = m.value.substring(url.length)
+        if (url.isNotEmpty()) appendLink(url, url)
+        append(trailing)
+        rest = rest.substring(m.range.last + 1)
+    }
+    append(rest)
+}
+
+// Inline text that makes links tappable. Blocks WITHOUT links keep plain
+// Text (so selection still works); blocks WITH links use ClickableText and
+// open the URL via the system handler. Previously the "url" annotations were
+// written but never consumed, so links looked underlined yet did nothing.
+@Composable
+private fun RichInlineText(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip
+) {
+    val annotated = remember(text) {
+        runCatching { renderRichInline(text) }.getOrElse { AnnotatedString(text) }
+    }
+    val hasLinks = remember(annotated) {
+        annotated.getStringAnnotations("url", 0, annotated.length).isNotEmpty()
+    }
+    if (hasLinks) {
+        val uriHandler = LocalUriHandler.current
+        ClickableText(
+            text = annotated,
+            style = style.copy(color = color),
+            maxLines = maxLines,
+            overflow = overflow,
+            modifier = modifier.semantics {
+                contentDescription = "Text with links"
+            },
+            onClick = { offset ->
+                annotated.getStringAnnotations("url", offset, offset)
+                    .firstOrNull()?.let { ann ->
+                        runCatching { uriHandler.openUri(ann.item) }
+                    }
+            }
+        )
+    } else {
+        Text(
+            text = annotated,
+            style = style,
+            color = color,
+            maxLines = maxLines,
+            overflow = overflow,
+            modifier = modifier
+        )
     }
 }
 
@@ -255,14 +334,14 @@ fun RichTextDocument(
                                 else -> MaterialTheme.typography.titleSmall.fontSize
                             } * textScale
                         )
-                        Text(
-                            text = renderRichInline(block.text),
+                        RichInlineText(
+                            text = block.text,
                             style = style,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    is RichBlock.Para -> Text(
-                        text = renderRichInline(block.text),
+                    is RichBlock.Para -> RichInlineText(
+                        text = block.text,
                         style = body,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -281,8 +360,8 @@ fun RichTextDocument(
                             color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.fillMaxHeight()
                         )
-                        Text(
-                            text = renderRichInline(block.text),
+                        RichInlineText(
+                            text = block.text,
                             style = body.copy(fontStyle = FontStyle.Italic),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
@@ -301,8 +380,8 @@ fun RichTextDocument(
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.widthIn(min = 16.dp)
                                 )
-                                Text(
-                                    text = renderRichInline(item),
+                                RichInlineText(
+                                    text = item,
                                     style = body,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
@@ -321,8 +400,8 @@ fun RichTextDocument(
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.widthIn(min = 24.dp)
                                 )
-                                Text(
-                                    text = renderRichInline(item),
+                                RichInlineText(
+                                    text = item,
                                     style = body,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
@@ -337,9 +416,10 @@ fun RichTextDocument(
                     ) {
                         Row(modifier = Modifier.fillMaxWidth()) {
                             block.headers.forEach { cell ->
-                                Text(
-                                    text = renderRichInline(cell),
+                                RichInlineText(
+                                    text = cell,
                                     style = body.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier
@@ -352,11 +432,12 @@ fun RichTextDocument(
                         block.rows.take(12).forEach { row ->
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 repeat(block.headers.size) { index ->
-                                    Text(
-                                        text = renderRichInline(row.getOrNull(index).orEmpty()),
+                                    RichInlineText(
+                                        text = row.getOrNull(index).orEmpty(),
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontSize = MaterialTheme.typography.bodySmall.fontSize * textScale
                                         ),
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 3,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
