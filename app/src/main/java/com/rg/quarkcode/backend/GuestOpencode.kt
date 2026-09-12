@@ -2,6 +2,7 @@ package com.rg.quarkcode.backend
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -100,6 +101,7 @@ object GuestOpencode {
         report(STAGE_RESOLVE, 1f, asset.fileName)
         val tmp = File(RuntimeFiles.root(context), "opencode.tgz")
         withContext(Dispatchers.IO) {
+            val scope = this
             val request = Request.Builder()
                 .url(asset.url)
                 .header("User-Agent", "Quark-Code")
@@ -116,7 +118,7 @@ object GuestOpencode {
                         val buf = ByteArray(256 * 1024)
                         var done = 0L
                         while (true) {
-                            coroutineContext.ensureActive()
+                            scope.ensureActive()
                             val n = input.read(buf)
                             if (n < 0) break
                             output.write(buf, 0, n)
