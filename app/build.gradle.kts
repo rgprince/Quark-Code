@@ -59,7 +59,10 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.srcDir(layout.buildDirectory.dir("generated/proot-jnilibs/arm64-v8a"))
+            jniLibs.srcDir(
+                layout.buildDirectory.dir("generated/proot-jnilibs/arm64-v8a")
+                    .get().asFile.absolutePath
+            )
         }
     }
 }
