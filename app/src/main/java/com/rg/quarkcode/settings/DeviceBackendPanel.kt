@@ -81,7 +81,7 @@ fun DeviceBackendPanel(
             }
             Switch(
                 checked = vm.enabled,
-                onCheckedChange = vm::setEnabled,
+                onCheckedChange = vm::setBackendEnabled,
                 modifier = Modifier.semantics { contentDescription = "Enable on-device backend" }
             )
         }

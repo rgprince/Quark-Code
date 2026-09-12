@@ -293,7 +293,7 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
 
     // ---- Service ----
 
-    fun setEnabled(value: Boolean) {
+    fun setBackendEnabled(value: Boolean) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { store.setEnabled(value) }
             enabled = value
