@@ -111,8 +111,12 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         debianJob = viewModelScope.launch {
             try {
                 debianStages = setStage(debianStages, DebianInstaller.STAGE_RESOLVE, StageState.ACTIVE)
-                val asset = withContext(Dispatchers.IO) { DebianInstaller.resolve() }
-                    ?: error("No Debian rootfs release found")
+                // Retry reuses the last resolved asset (no API call); a fresh
+                // "check" clears it first via the update path below.
+                val asset = withContext(Dispatchers.IO) { store.cachedDebianAsset() }
+                    ?: withContext(Dispatchers.IO) {
+                        DebianInstaller.resolve().also { store.saveDebianAsset(it) }
+                    }
                 debianStages = setStage(
                     debianStages, DebianInstaller.STAGE_RESOLVE, StageState.DONE, 1f, asset.fileName
                 )
@@ -165,7 +169,7 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
 
     // ---- Section 2: official opencode ----
 
-    fun downloadOpencode() {
+    fun downloadOpencode(checkUpdate: Boolean = false) {
         if (opencodeJob?.isActive == true) return
         if (!DebianInstaller.isInstalled(app)) {
             error = "Install the Debian system first"
@@ -181,8 +185,12 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         opencodeJob = viewModelScope.launch {
             try {
                 opencodeStages = setStage(opencodeStages, GuestOpencode.STAGE_RESOLVE, StageState.ACTIVE)
-                val asset = withContext(Dispatchers.IO) { GuestOpencode.resolve() }
-                    ?: error("No official opencode release found")
+                // Update checks bypass the cached asset so they see upstream.
+                if (checkUpdate) withContext(Dispatchers.IO) { store.clearOpencodeAsset() }
+                val asset = withContext(Dispatchers.IO) { store.cachedOpencodeAsset() }
+                    ?: withContext(Dispatchers.IO) {
+                        GuestOpencode.resolve().also { store.saveOpencodeAsset(it) }
+                    }
                 opencodeStages = setStage(
                     opencodeStages, GuestOpencode.STAGE_RESOLVE, StageState.DONE, 1f,
                     "${asset.fileName} · v${asset.version}"

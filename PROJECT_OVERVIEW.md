@@ -196,6 +196,18 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8.1 scope — installer honesty + settings fill
+- [x] Resolve tells the truth: rate-limit/HTTP/empty/parse errors surfaced
+  verbatim, 30-release scan, loose-name second pass, candidates logged
+- [x] Resume everywhere: HTTP Range continues dead downloads, complete tmp
+  skips network, resolved assets cached (retries skip the API), update path
+  forces fresh resolve
+- [x] Look filled: light default on fresh installs, AMOLED theme, density,
+  timestamps toggle, theme chips
+- [x] Chat filled: auto-scroll, playful status, thought lines toggles +
+  clear-launch-cache row (all persisted)
+- [x] v0.11.0 (code 11), same dummy key — `adb install -r` updates
+
 ## V8 scope — official opencode in Debian guest (Hope retired)
 - [x] Hope transplant retired: official `opencode-linux-arm64` from
   opencode-ai releases, updates track upstream (autoupdate disabled,

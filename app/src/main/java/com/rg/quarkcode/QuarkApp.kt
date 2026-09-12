@@ -54,10 +54,10 @@ private data object DiffRoute
 fun QuarkApp(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val themeStore = remember { ThemeStore(context.applicationContext) }
-    val themeMode by themeStore.mode.collectAsState(initial = ThemeMode.SYSTEM)
+    val themeMode by themeStore.mode.collectAsState(initial = ThemeMode.LIGHT)
     val systemDark = isSystemInDarkTheme()
     val dark = when (themeMode) {
-        ThemeMode.DARK -> true
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
         ThemeMode.LIGHT -> false
         ThemeMode.SYSTEM, ThemeMode.DYNAMIC -> systemDark
     }
@@ -253,10 +253,21 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                     settingsVm.setTextScale(value)
                                     chatVm.setTextScale(value)
                                 },
+                                comfortable = chatVm.uiState.comfortable,
+                                onComfortableChange = chatVm::setComfortable,
+                                showTimestamps = chatVm.uiState.showTimestamps,
+                                onShowTimestampsChange = chatVm::setShowTimestamps,
                                 sendBehavior = chatVm.uiState.sendBehavior,
                                 onSendBehaviorChange = chatVm::setSendBehavior,
                                 autoSpeak = chatVm.uiState.autoSpeak,
                                 onAutoSpeakChange = chatVm::setAutoSpeak,
+                                autoScroll = chatVm.uiState.autoScroll,
+                                onAutoScrollChange = chatVm::setAutoScroll,
+                                playfulStatus = chatVm.uiState.playfulStatus,
+                                onPlayfulChange = chatVm::setPlayfulStatus,
+                                showThoughts = chatVm.uiState.showThoughts,
+                                onShowThoughtsChange = chatVm::setShowThoughts,
+                                onClearCache = chatVm::clearLaunchCache,
                                 onOpenUsage = { backStack.add(UsageRoute) },
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,

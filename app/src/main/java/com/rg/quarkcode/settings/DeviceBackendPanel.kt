@@ -207,7 +207,7 @@ fun DeviceBackendPanel(
             }
             if (vm.opencodeVersion != null && vm.opencodeStages.isEmpty()) {
                 OutlinedButton(
-                    onClick = vm::downloadOpencode,
+                    onClick = { vm.downloadOpencode(checkUpdate = true) },
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
                     Text("Check for opencode update")

@@ -31,6 +31,8 @@ class RuntimeStore(private val context: Context) {
         val RUNTIME_VERSION = stringPreferencesKey("runtime_version")
         val DEBIAN_VERSION = stringPreferencesKey("debian_version")
         val OPENCODE_VERSION = stringPreferencesKey("opencode_version")
+        val DEBIAN_ASSET = stringPreferencesKey("debian_asset")
+        val OPENCODE_ASSET = stringPreferencesKey("opencode_asset")
         val SERVER_PASSWORD = stringPreferencesKey("server_password")
     }
 
@@ -64,6 +66,37 @@ class RuntimeStore(private val context: Context) {
         context.runtimeDataStore.edit {
             if (version == null) it.remove(Keys.OPENCODE_VERSION) else it[Keys.OPENCODE_VERSION] = version
         }
+    }
+
+    /** Last resolved assets — retries reuse them without another API call. */
+    suspend fun saveDebianAsset(asset: DebianAsset) {
+        context.runtimeDataStore.edit {
+            it[Keys.DEBIAN_ASSET] = assetJson.encodeToString(asset)
+        }
+    }
+
+    suspend fun cachedDebianAsset(): DebianAsset? {
+        val raw: String = context.runtimeDataStore.data.map { it[Keys.DEBIAN_ASSET] }.first() ?: return null
+        return runCatching { assetJson.decodeFromString<DebianAsset>(raw) }.getOrNull()
+    }
+
+    suspend fun saveOpencodeAsset(asset: OpencodeAsset) {
+        context.runtimeDataStore.edit {
+            it[Keys.OPENCODE_ASSET] = assetJson.encodeToString(asset)
+        }
+    }
+
+    suspend fun cachedOpencodeAsset(): OpencodeAsset? {
+        val raw: String = context.runtimeDataStore.data.map { it[Keys.OPENCODE_ASSET] }.first() ?: return null
+        return runCatching { assetJson.decodeFromString<OpencodeAsset>(raw) }.getOrNull()
+    }
+
+    suspend fun clearOpencodeAsset() {
+        context.runtimeDataStore.edit { it.remove(Keys.OPENCODE_ASSET) }
+    }
+
+    companion object {
+        private val assetJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     }
 
     /** Stable per-install password, generated once and reused across restarts. */

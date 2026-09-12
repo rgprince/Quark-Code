@@ -2,16 +2,13 @@ package com.rg.quarkcode.backend
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
+import kotlinx.serialization.json.Jsonimport okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.coroutineContext
 
 @Serializable
 private data class OcAsset(
@@ -28,6 +25,7 @@ private data class OcRelease(
     val assets: List<OcAsset> = emptyList()
 )
 
+@Serializable
 data class OpencodeAsset(
     val version: String,
     val fileName: String,
@@ -68,7 +66,8 @@ object GuestOpencode {
         return f.isFile && f.length() > 10_000_000L
     }
 
-    suspend fun resolve(): OpencodeAsset? = withContext(Dispatchers.IO) {
+    /** Throws with a human-readable reason — the UI shows it verbatim. */
+    suspend fun resolve(): OpencodeAsset = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(LATEST_URL)
             .header("User-Agent", "Quark-Code")
@@ -76,15 +75,28 @@ object GuestOpencode {
             .get()
             .build()
         val text = http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@withContext null
-            response.body?.string() ?: return@withContext null
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val limited = response.code == 403 && body.contains("rate limit", ignoreCase = true)
+                error(
+                    if (limited) "GitHub rate-limited this network — wait a few minutes and retry."
+                    else "opencode release lookup failed (HTTP ${response.code})."
+                )
+            }
+            if (body.isBlank()) error("opencode release lookup returned nothing.")
+            body
         }
         val release = runCatching { json.decodeFromString<OcRelease>(text) }.getOrNull()
-            ?: return@withContext null
+            ?: error("opencode release list was unreadable.")
         // Official install script uses opencode-linux-<arch>.tar.gz.
         val match = release.assets.firstOrNull { asset ->
             asset.name == "opencode-linux-arm64.tar.gz" && asset.url.isNotBlank()
-        } ?: return@withContext null
+        }
+        if (match == null) {
+            val names = release.assets.map { it.name }.take(10)
+            LocalBackend.appendLog("resolve: opencode assets: ${names.joinToString(", ")}")
+            error("Latest opencode has no linux-arm64 build listed.")
+        }
         OpencodeAsset(
             version = release.tag.trim().removePrefix("v").ifBlank { "unknown" },
             fileName = match.name,
@@ -101,35 +113,11 @@ object GuestOpencode {
         report(STAGE_RESOLVE, 1f, asset.fileName)
         val tmp = File(RuntimeFiles.root(context), "opencode.tgz")
         withContext(Dispatchers.IO) {
-            val scope = this
-            val request = Request.Builder()
-                .url(asset.url)
-                .header("User-Agent", "Quark-Code")
-                .header("Accept", "application/octet-stream")
-                .get()
-                .build()
-            http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) error("opencode download failed (HTTP ${response.code})")
-                val body = response.body ?: error("Empty download body")
-                val total = body.contentLength().takeIf { it > 0 } ?: asset.size.takeIf { it > 0 } ?: -1L
-                tmp.parentFile?.mkdirs()
-                body.byteStream().use { input ->
-                    tmp.outputStream().use { output ->
-                        val buf = ByteArray(256 * 1024)
-                        var done = 0L
-                        while (true) {
-                            scope.ensureActive()
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            output.write(buf, 0, n)
-                            done += n
-                            val fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else -1f
-                            report(STAGE_DOWNLOAD, fraction, "${formatMb(done)}" +
-                                (if (total > 0) " / ${formatMb(total)}" else ""))
-                        }
-                        output.flush()
-                    }
-                }
+            HttpDownload.get(this, asset.url, tmp, asset.size) { done, total ->
+                val fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else -1f
+                val resumed = if (done > 0 && total > 0 && done < total) " (resumed)" else ""
+                report(STAGE_DOWNLOAD, fraction, "${formatMb(done)}" +
+                    (if (total > 0) " / ${formatMb(total)}" else "") + resumed)
             }
         }
         withContext(Dispatchers.IO) {

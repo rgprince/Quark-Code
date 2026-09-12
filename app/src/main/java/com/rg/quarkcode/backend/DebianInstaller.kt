@@ -2,7 +2,6 @@ package com.rg.quarkcode.backend
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -11,7 +10,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.coroutineContext
 
 @Serializable
 private data class DistroAsset(
@@ -28,12 +26,18 @@ private data class DistroRelease(
     val assets: List<DistroAsset> = emptyList()
 )
 
+@Serializable
 data class DebianAsset(
     val version: String,
     val fileName: String,
     val url: String,
     val size: Long
 )
+
+private sealed interface ResolveOutcome {
+    data class Hit(val asset: DebianAsset) : ResolveOutcome
+    data class Miss(val reason: String) : ResolveOutcome
+}
 
 /**
  * Debian slim guest installer. Source: proot-distro's versioned
@@ -51,9 +55,9 @@ object DebianInstaller {
     const val MARKER_NAME = ".installed"
 
     private const val RELEASES_URL =
-        "https://api.github.com/repos/termux/proot-distro/releases?per_page=10"
+        "https://api.github.com/repos/termux/proot-distro/releases?per_page=30"
     private const val RELEASES_FALLBACK_URL =
-        "https://api.github.com/repos/theworkjoy/proot-distro/releases?per_page=10"
+        "https://api.github.com/repos/theworkjoy/proot-distro/releases?per_page=30"
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -72,11 +76,20 @@ object DebianInstaller {
         installedVersion(context) != null &&
             File(RuntimeFiles.guest(context), "etc/debian_version").isFile
 
-    suspend fun resolve(): DebianAsset? = withContext(Dispatchers.IO) {
-        resolveFrom(RELEASES_URL) ?: resolveFrom(RELEASES_FALLBACK_URL)
+    /** Throws with a human-readable reason — the UI shows it verbatim. */
+    suspend fun resolve(): DebianAsset = withContext(Dispatchers.IO) {
+        val problems = mutableListOf<String>()
+        for (url in listOf(RELEASES_URL, RELEASES_FALLBACK_URL)) {
+            when (val outcome = resolveFrom(url)) {
+                is ResolveOutcome.Hit -> return@withContext outcome.asset
+                is ResolveOutcome.Miss -> problems += outcome.reason
+            }
+        }
+        error("No Debian rootfs release found. " + problems.joinToString(" "))
     }
 
-    private fun resolveFrom(url: String): DebianAsset? {
+    private fun resolveFrom(url: String): ResolveOutcome {
+        val host = url.substringAfter("https://").substringBefore("/")
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", "Quark-Code")
@@ -84,28 +97,61 @@ object DebianInstaller {
             .get()
             .build()
         val text = http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
-            response.body?.string() ?: return null
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val limited = response.code == 403 &&
+                    (body.contains("rate limit", ignoreCase = true) ||
+                        body.contains("API rate limit", ignoreCase = true))
+                return if (limited) {
+                    ResolveOutcome.Miss(
+                        "$host rate-limited this network — wait a few minutes and retry."
+                    )
+                } else {
+                    ResolveOutcome.Miss("$host answered HTTP ${response.code}.")
+                }
+            }
+            if (body.isBlank()) return ResolveOutcome.Miss("$host returned an empty list.")
+            body
         }
         val releases = runCatching { json.decodeFromString<List<DistroRelease>>(text) }
-            .getOrNull() ?: return null
-        for (release in releases) {
-            if (release.draft) continue
-            val match = release.assets.firstOrNull { asset ->
-                asset.name.startsWith("debian-aarch64-pd-") &&
-                    asset.name.endsWith(".tar.xz") &&
-                    asset.url.isNotBlank()
-            } ?: continue
-            return DebianAsset(
-                version = match.name
-                    .removePrefix("debian-aarch64-pd-")
-                    .removeSuffix(".tar.xz"),
-                fileName = match.name,
-                url = match.url,
-                size = match.size
-            )
+            .getOrNull() ?: return ResolveOutcome.Miss("$host sent an unreadable release list.")
+        if (releases.isEmpty()) return ResolveOutcome.Miss("$host has no releases listed.")
+        // Pass 1: exact proot-distro naming. Pass 2: loose (any debian+aarch64
+        // tarball that isn't oldstable) so upstream renames don't brick us.
+        var candidates = emptyList<String>()
+        for (loose in listOf(false, true)) {
+            for (release in releases) {
+                if (release.draft) continue
+                val match = release.assets.firstOrNull { asset ->
+                    asset.url.isNotBlank() && if (!loose) {
+                        asset.name.startsWith("debian-aarch64-pd-") && asset.name.endsWith(".tar.xz")
+                    } else {
+                        val n = asset.name.lowercase()
+                        n.contains("debian") && n.contains("aarch64") &&
+                            n.endsWith(".tar.xz") && !n.contains("oldstable")
+                    }
+                }
+                if (match != null) {
+                    return ResolveOutcome.Hit(
+                        DebianAsset(
+                            version = match.name
+                                .removePrefix("debian-aarch64-pd-")
+                                .removeSuffix(".tar.xz"),
+                            fileName = match.name,
+                            url = match.url,
+                            size = match.size
+                        )
+                    )
+                }
+            }
+            if (!loose) {
+                candidates = releases.take(8).flatMap { it.assets }.map { it.name }.take(12)
+            }
         }
-        return null
+        LocalBackend.appendLog("resolve: closest assets: ${candidates.joinToString(", ")}")
+        return ResolveOutcome.Miss(
+            "$host: scanned ${releases.size} releases, no Debian aarch64 rootfs asset."
+        )
     }
 
     suspend fun install(
@@ -115,38 +161,15 @@ object DebianInstaller {
     ) {
         val guest = RuntimeFiles.guest(context)
         report(STAGE_RESOLVE, 1f, asset.fileName)
-        // Download (fraction by bytes).
+        // Download — resumable: a dead attempt restarts from the last byte,
+        // and a complete tmp skips the network entirely.
         val tmp = File(RuntimeFiles.root(context), "debian.tmp")
         withContext(Dispatchers.IO) {
-            val scope = this
-            val request = Request.Builder()
-                .url(asset.url)
-                .header("User-Agent", "Quark-Code")
-                .header("Accept", "application/octet-stream")
-                .get()
-                .build()
-            http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) error("Debian download failed (HTTP ${response.code})")
-                val body = response.body ?: error("Empty download body")
-                val total = body.contentLength().takeIf { it > 0 } ?: asset.size.takeIf { it > 0 } ?: -1L
-                tmp.parentFile?.mkdirs()
-                body.byteStream().use { input ->
-                    tmp.outputStream().use { output ->
-                        val buf = ByteArray(256 * 1024)
-                        var done = 0L
-                        while (true) {
-                            scope.ensureActive()
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            output.write(buf, 0, n)
-                            done += n
-                            val fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else -1f
-                            report(STAGE_DOWNLOAD, fraction, "${formatMb(done)}" +
-                                (if (total > 0) " / ${formatMb(total)}" else ""))
-                        }
-                        output.flush()
-                    }
-                }
+            HttpDownload.get(this, asset.url, tmp, asset.size) { done, total ->
+                val fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else -1f
+                val resumed = if (done > 0 && total > 0 && done < total) " (resumed)" else ""
+                report(STAGE_DOWNLOAD, fraction, "${formatMb(done)}" +
+                    (if (total > 0) " / ${formatMb(total)}" else "") + resumed)
             }
         }
         // Extract (fraction by files every 500 + bytes detail).

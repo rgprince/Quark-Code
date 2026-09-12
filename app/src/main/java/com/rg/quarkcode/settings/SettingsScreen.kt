@@ -3,6 +3,8 @@ package com.rg.quarkcode.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +28,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +65,14 @@ private enum class SettingsTab(val label: String) {
     STATS("Stats")
 }
 
+private fun themeLabel(mode: ThemeMode): String = when (mode) {
+    ThemeMode.SYSTEM -> "System"
+    ThemeMode.DARK -> "Void"
+    ThemeMode.LIGHT -> "Paper"
+    ThemeMode.DYNAMIC -> "Dynamic"
+    ThemeMode.AMOLED -> "AMOLED"
+}
+
 // Tabbed settings: one concern per tab instead of an endless scroll.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,10 +91,21 @@ fun SettingsScreen(
     onDetailedChange: (Boolean) -> Unit,
     textScale: Float,
     onTextScaleChange: (Float) -> Unit,
+    comfortable: Boolean,
+    onComfortableChange: (Boolean) -> Unit,
+    showTimestamps: Boolean,
+    onShowTimestampsChange: (Boolean) -> Unit,
     sendBehavior: String,
     onSendBehaviorChange: (String) -> Unit,
     autoSpeak: Boolean,
     onAutoSpeakChange: (Boolean) -> Unit,
+    autoScroll: Boolean,
+    onAutoScrollChange: (Boolean) -> Unit,
+    playfulStatus: Boolean,
+    onPlayfulChange: (Boolean) -> Unit,
+    showThoughts: Boolean,
+    onShowThoughtsChange: (Boolean) -> Unit,
+    onClearCache: () -> Unit,
     onOpenUsage: () -> Unit,
     onNewMcpNameChange: (String) -> Unit,
     onNewMcpUrlChange: (String) -> Unit,
@@ -224,24 +246,53 @@ fun SettingsScreen(
                         }
                     }
                 }
-                SettingsTab.APPEARANCE -> {                    item(key = "appearance") {
+                SettingsTab.APPEARANCE -> {
+                    item(key = "appearance") {
                         SettingsSection(title = "Appearance", icon = Icons.Filled.Palette) {
                             Text(
-                                text = "Void is dark, Paper is light, Dynamic follows your wallpaper (Android 12+).",
+                                text = "Paper is light, Void is dark, AMOLED is pure black, Dynamic follows your wallpaper (Android 12+).",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                                ThemeMode.entries.forEachIndexed { index, mode ->
-                                    SegmentedButton(
-                                        shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                ThemeMode.entries.forEach { mode ->
+                                    FilterChip(
                                         selected = state.theme == mode,
                                         onClick = { onThemeChange(mode) },
-                                        label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                                        label = { Text(themeLabel(mode)) }
                                     )
                                 }
                             }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Density",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                listOf("Compact" to false, "Comfortable" to true)
+                                    .forEachIndexed { index, (label, value) ->
+                                        SegmentedButton(
+                                            shape = SegmentedButtonDefaults.itemShape(index, 2),
+                                            selected = comfortable == value,
+                                            onClick = { onComfortableChange(value) },
+                                            label = { Text(label) }
+                                        )
+                                    }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            ChatToggle(
+                                title = "Timestamps",
+                                subtitle = "Show message times in chat",
+                                checked = showTimestamps,
+                                onCheckedChange = onShowTimestampsChange
+                            )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "Text size",
@@ -334,6 +385,43 @@ fun SettingsScreen(
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary
                                 )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            ChatToggle(
+                                title = "Auto-scroll",
+                                subtitle = "Follow new messages to the bottom",
+                                checked = autoScroll,
+                                onCheckedChange = onAutoScrollChange
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            ChatToggle(
+                                title = "Playful status",
+                                subtitle = "Cooking… bubble while waiting for a reply",
+                                checked = playfulStatus,
+                                onCheckedChange = onPlayfulChange
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            ChatToggle(
+                                title = "Thought lines",
+                                subtitle = "Show Thought · time above replies",
+                                checked = showThoughts,
+                                onCheckedChange = onShowThoughtsChange
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onClearCache),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Clear launch cache", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = "Forget saved chats and models shown at startup",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }

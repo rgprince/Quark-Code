@@ -72,6 +72,11 @@ fun MessageList(
     thinking: Boolean,
     busy: Boolean = false,
     awaitingReply: Boolean = false,
+    autoScroll: Boolean = true,
+    playfulStatus: Boolean = true,
+    showThoughts: Boolean = true,
+    comfortable: Boolean = false,
+    showTimestamps: Boolean = true,
     thinkingSecs: Int = 0,
     speakingId: String?,
     thoughtMs: Long? = null,
@@ -99,7 +104,8 @@ fun MessageList(
     }
     val listState = rememberLazyListState()
     // Smooth follow: stick to bottom on new content only when already near the end.
-    LaunchedEffect(timeline.size, thinking) {
+    LaunchedEffect(timeline.size, thinking, autoScroll) {
+        if (!autoScroll) return@LaunchedEffect
         val last = listState.layoutInfo.totalItemsCount - 1
         if (last < 0) return@LaunchedEffect
         val visible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -121,7 +127,7 @@ fun MessageList(
         state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(if (comfortable) 10.dp else 6.dp)
     ) {
         itemsIndexed(
             timeline,
@@ -133,6 +139,7 @@ fun MessageList(
                     UserBubble(
                         message = entry.message,
                         textScale = textScale,
+                        showTimestamp = showTimestamps,
                         modifier = Modifier.animateItem()
                     )
                     // Think-then-reply order: the thought line belongs right
@@ -140,7 +147,9 @@ fun MessageList(
                     // recorded a phase OR when the transcript itself holds
                     // reasoning — old chats never run the timer, so without
                     // this fallback the line never appears for them.
-                    if (index == lastUserIndex && (thoughtMs != null || thoughtText.isNotBlank())) {
+                    if (index == lastUserIndex && showThoughts &&
+                        (thoughtMs != null || thoughtText.isNotBlank())
+                    ) {
                         ThoughtDoneRow(
                             ms = thoughtMs,
                             text = thoughtText,
@@ -264,13 +273,16 @@ fun MessageList(
                     onToggle = null,
                     modifier = Modifier.animateItem()
                 )
-                is TimelineEntry.Footer -> Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateItem(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                is TimelineEntry.Footer -> {
+                    val showTime = showTimestamps && entry.timestamp > 0L
+                    if (entry.text.isNotBlank() || showTime) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                     if (entry.text.isNotBlank()) {
                         val speaking = speakingId == entry.id
                         IconButton(
@@ -285,11 +297,15 @@ fun MessageList(
                             )
                         }
                     }
-                    Text(
-                        text = formatTime(entry.timestamp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (showTime) {
+                        Text(
+                            text = formatTime(entry.timestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                }
                 }
             }
         }
@@ -301,7 +317,7 @@ fun MessageList(
         // with no activity row yet never looks dead. Both are suppressed
         // while a running activity row already shows progress.
         val lastIsUser = messages.lastOrNull()?.isUser == true
-        val showCooking = awaitingReply && lastIsUser
+        val showCooking = awaitingReply && lastIsUser && playfulStatus
         if (showCooking) {
             item(key = "cooking-bubble") {
                 CookingBubble(modifier = Modifier.animateItem())
@@ -492,6 +508,7 @@ private fun ThinkingTail(    seconds: Int = 0,
 private fun UserBubble(
     message: ChatMessage,
     textScale: Float = 1f,
+    showTimestamp: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val body = message.text
@@ -524,7 +541,7 @@ private fun UserBubble(
                         )
                     )
                 }
-                if (message.timestamp > 0L) {
+                if (showTimestamp && message.timestamp > 0L) {
                     Text(
                         text = formatTime(message.timestamp),
                         style = MaterialTheme.typography.labelSmall,

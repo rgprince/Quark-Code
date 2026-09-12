@@ -101,7 +101,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     detailedTools = prefs.detailed,
                     sendBehavior = prefs.sendBehavior,
                     autoSpeak = prefs.autoSpeak,
-                    textScale = prefs.textScale
+                    textScale = prefs.textScale,
+                    autoScroll = prefs.autoScroll,
+                    playfulStatus = prefs.playfulStatus,
+                    showThoughts = prefs.showThoughts,
+                    comfortable = prefs.comfortable,
+                    showTimestamps = prefs.showTimestamps
                 )
             }
         }
@@ -360,6 +365,36 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun setDetailedTools(value: Boolean) {
         uiState = uiState.copy(detailedTools = value)
         viewModelScope.launch { chatPrefs?.setDetailed(value) }
+    }
+
+    fun setAutoScroll(value: Boolean) {
+        uiState = uiState.copy(autoScroll = value)
+        viewModelScope.launch { chatPrefs?.setAutoScroll(value) }
+    }
+
+    fun setPlayfulStatus(value: Boolean) {
+        uiState = uiState.copy(playfulStatus = value)
+        viewModelScope.launch { chatPrefs?.setPlayfulStatus(value) }
+    }
+
+    fun setShowThoughts(value: Boolean) {
+        uiState = uiState.copy(showThoughts = value)
+        viewModelScope.launch { chatPrefs?.setShowThoughts(value) }
+    }
+
+    fun setComfortable(value: Boolean) {
+        uiState = uiState.copy(comfortable = value)
+        viewModelScope.launch { chatPrefs?.setComfortable(value) }
+    }
+
+    fun setShowTimestamps(value: Boolean) {
+        uiState = uiState.copy(showTimestamps = value)
+        viewModelScope.launch { chatPrefs?.setShowTimestamps(value) }
+    }
+
+    /** Clears the instant-launch snapshot (chats + catalog re-fetch live). */
+    fun clearLaunchCache() {
+        viewModelScope.launch { cacheStore?.clear() }
     }
 
     fun setTextScale(value: Float) {

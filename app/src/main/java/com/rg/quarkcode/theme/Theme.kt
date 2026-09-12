@@ -44,8 +44,34 @@ private val VoidScheme = darkColorScheme(
     background = Color(0xFF0B0B0E)
 )
 
-private val PaperScheme = lightColorScheme(
-    primary = Color(0xFF3B5BDB),
+// Pure-black AMOLED dark: Void hues on a true-black base.
+private val AmoledScheme = darkColorScheme(
+    primary = Color(0xFF8AB4FF),
+    onPrimary = Color(0xFF0B1B33),
+    primaryContainer = Color(0xFF2A3B5C),
+    onPrimaryContainer = Color(0xFFD6E4FF),
+    secondary = Color(0xFFB39DDB),
+    secondaryContainer = Color(0xFF2A2438),
+    onSecondaryContainer = Color(0xFFE2D9F5),
+    tertiary = Color(0xFF7DD6C2),
+    tertiaryContainer = Color(0xFF1E3A34),
+    onTertiaryContainer = Color(0xFFBFE9DF),
+    error = Color(0xFFFFB4AB),
+    errorContainer = Color(0xFF5C1E1A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    surface = Color(0xFF000000),
+    surfaceVariant = Color(0xFF0A0A0A),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF080808),
+    surfaceContainer = Color(0xFF0D0D0D),
+    surfaceContainerHigh = Color(0xFF141414),
+    surfaceContainerHighest = Color(0xFF1B1B1B),
+    outline = Color(0xFF2A2A2A),
+    outlineVariant = Color(0xFF1A1A1A),
+    background = Color(0xFF000000)
+)
+
+private val PaperScheme = lightColorScheme(    primary = Color(0xFF3B5BDB),
     onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFDCE4FF),
     onPrimaryContainer = Color(0xFF1A2B5C),
@@ -91,6 +117,7 @@ fun QuarkTheme(
     val useDynamic = mode == ThemeMode.DYNAMIC &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val colorScheme = when {
+        mode == ThemeMode.AMOLED -> AmoledScheme
         useDynamic && (dark ?: systemDark) -> dynamicDarkColorScheme(context)
         useDynamic -> dynamicLightColorScheme(context)
         dark ?: systemDark -> VoidScheme
