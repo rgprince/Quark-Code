@@ -196,6 +196,18 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V6.5 scope — QoL batch (links, per-chat model, instant cache, simpler settings)
+- [x] Links get primary colour (underlined + medium)
+- [x] Per-chat model memory: opening a chat adopts its backend-tagged model
+- [x] Instant illusion: `CacheStore` snapshot (chats + catalog) paints on
+  launch, refreshed by every live load (also fresh on close)
+- [x] Settings: Server tab → Stats tab (Usage only); About, diagnostics,
+  server version, start command removed (code too)
+- [x] Schedules UI removed (drawer entry + route; files stay dormant)
+- [x] App starts at chat, auto-attaches saved backend; URL editable anytime
+  in Settings → Connection → Test & save
+- [x] v0.8.0 (code 8), same dummy key — `adb install -r` updates
+
 ## V6.4 scope — links, no-more-fake-idle, cooking bubble
 - [x] Links tappable: `[text](url)` was annotated but never consumed; now
   `ClickableText` + `LocalUriHandler`, plus bare-URL auto-linking

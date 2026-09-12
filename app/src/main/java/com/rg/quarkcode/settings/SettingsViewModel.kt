@@ -50,16 +50,6 @@ data class SettingsUiState(
     val authDialog: ProviderAuthDialog? = null,
     val detailedTools: Boolean = false,
     val textScale: Float = 1f,
-    val serverVersion: String? = null,
-    val serverConfigJson: String? = null,
-    val configDraft: String = "",
-    val configEditing: Boolean = false,
-    val configSaving: Boolean = false,
-    val configError: String? = null,
-    val infoProviders: List<ProviderChoice> = emptyList(),
-    val infoCommands: List<com.rg.quarkcode.backend.OpenCodeCommand> = emptyList(),
-    val infoSkills: List<com.rg.quarkcode.backend.OpenCodeSkill> = emptyList(),
-    val infoLoading: Boolean = false,
     val mcpServers: Map<String, McpStatus> = emptyMap(),
     val mcpLoading: Boolean = false,
     val newMcpName: String = "",
@@ -69,7 +59,6 @@ data class SettingsUiState(
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val app = application
     private val connectionStore = ConnectionStore(application)
     private val themeStore = ThemeStore(application)
     private val modelStore = com.rg.quarkcode.backend.ModelStore(application)
@@ -144,7 +133,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun loadAll() {
         loadMcp()
         loadChatPrefs()
-        loadServerInfo()
     }
 
     private fun loadChatPrefs() {
@@ -170,131 +158,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { chatPrefs.setDetailed(value) }
     }
 
-    private fun loadServerInfo() {
-        viewModelScope.launch {
-            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
-            val host = saved.host.ifBlank { return@launch }
-            runCatching {
-                ServeApi(host, saved.username, saved.password).get<Health>("global/health")
-            }.onSuccess { health ->
-                uiState = uiState.copy(
-                    serverVersion = health.version.takeIf { it.isNotBlank() }
-                )
-            }
-        }
-    }
-
-    fun diagnosticsText(): String = buildString {
-        appendLine("Quark Code ${appVersion()} (com.rg.quarkcode)")
-        appendLine("Host: ${uiState.host}")
-        appendLine("Server: ${uiState.serverVersion ?: "unknown"}")
-        appendLine("Provider: ${uiState.selectedProviderId ?: "none"}")
-        appendLine("Theme: ${uiState.theme}")
-        appendLine("MCP servers: ${uiState.mcpServers.size}")
-        appendLine("Memory: ${memoryLine()}")
-        appendLine("Storage: ${storageLine()}")
-    }
-
-    private fun appVersion(): String = runCatching {
-        val info = app.packageManager.getPackageInfo(app.packageName, 0)
-        info.versionName ?: "0.1.0"
-    }.getOrNull() ?: "0.1.0"
-
-    private fun memoryLine(): String {
-        val runtime = Runtime.getRuntime()
-        val used = (runtime.totalMemory() - runtime.freeMemory()) / 1048576
-        val max = runtime.maxMemory() / 1048576
-        return "app ${used}M / max ${max}M"
-    }
-
-    private fun storageLine(): String = runCatching {
-        val stat = android.os.StatFs(android.os.Environment.getDataDirectory().path)
-        val free = stat.availableBytes / 1073741824
-        val total = stat.totalBytes / 1073741824
-        "free ${free}G / total ${total}G"
-    }.getOrNull() ?: "unknown"
-
-    // ---- Server info inspector (and-code ServerInfo parity: config + lists) ----
-
-    fun loadServerInfoFull() {
-        viewModelScope.launch {
-            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
-            val host = saved.host.ifBlank { return@launch }
-            val api = ServeApi(host, saved.username, saved.password)
-            uiState = uiState.copy(infoLoading = true)
-            val config = runCatching {
-                api.get<kotlinx.serialization.json.JsonObject>("config")
-            }.getOrNull()
-            val providers = runCatching {
-                api.get<com.rg.quarkcode.backend.ProvidersResponse>("config/providers")
-            }.getOrNull()
-            val commands = runCatching {
-                api.getList<com.rg.quarkcode.backend.OpenCodeCommand>("command")
-            }.getOrNull()
-            val skills = runCatching {
-                api.getList<com.rg.quarkcode.backend.OpenCodeSkill>("skill")
-            }.getOrNull()
-            val pretty = config?.let {
-                kotlinx.serialization.json.Json { prettyPrint = true }
-                    .encodeToString(kotlinx.serialization.json.JsonObject.serializer(), it)
-            }
-            uiState = uiState.copy(
-                infoLoading = false,
-                serverConfigJson = pretty,
-                configDraft = pretty ?: uiState.configDraft,
-                infoProviders = providers?.providers?.map {
-                    ProviderChoice(it.id, it.name.ifBlank { it.id }, true)
-                } ?: emptyList(),
-                infoCommands = commands ?: emptyList(),
-                infoSkills = skills ?: emptyList()
-            )
-        }
-    }
-
-    fun startEditConfig() {
-        uiState = uiState.copy(
-            configEditing = true,
-            configDraft = uiState.serverConfigJson ?: "",
-            configError = null
-        )
-    }
-
-    fun cancelEditConfig() {
-        uiState = uiState.copy(configEditing = false, configError = null)
-    }
-
-    fun onConfigDraftChange(value: String) {
-        uiState = uiState.copy(configDraft = value, configError = null)
-    }
-
-    fun saveConfig() {
-        viewModelScope.launch {
-            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
-            val host = saved.host.ifBlank { return@launch }
-            val body = runCatching {
-                kotlinx.serialization.json.Json.parseToJsonElement(uiState.configDraft)
-                    as? kotlinx.serialization.json.JsonObject
-                    ?: throw IllegalArgumentException("Config must be a JSON object")
-            }.getOrElse { err ->
-                uiState = uiState.copy(configError = err.message ?: "Invalid JSON")
-                return@launch
-            }
-            uiState = uiState.copy(configSaving = true, configError = null)
-            val result = runCatching {
-                ServeApi(host, saved.username, saved.password)
-                    .patch<kotlinx.serialization.json.JsonObject>("config", body)
-            }
-            result.onSuccess {
-                uiState = uiState.copy(configSaving = false, configEditing = false)
-                loadServerInfoFull()
-            }.onFailure { err ->
-                uiState = uiState.copy(
-                    configSaving = false,
-                    configError = err.message ?: "Could not save config"
-                )
-            }
-        }
-    }
+    // ---- Provider catalog (Settings has its own VM) ----
 
     fun loadProviders() {
         viewModelScope.launch {

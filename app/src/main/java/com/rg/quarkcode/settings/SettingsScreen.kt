@@ -15,11 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
@@ -52,8 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rg.quarkcode.backend.ThemeMode
@@ -63,7 +58,7 @@ private enum class SettingsTab(val label: String) {
     APPEARANCE("Look"),
     CHAT("Chat"),
     MCP("MCP"),
-    SERVER("Server")
+    STATS("Stats")
 }
 
 // Tabbed settings: one concern per tab instead of an endless scroll.
@@ -88,8 +83,6 @@ fun SettingsScreen(
     onSendBehaviorChange: (String) -> Unit,
     autoSpeak: Boolean,
     onAutoSpeakChange: (Boolean) -> Unit,
-    serverVersion: String?,
-    diagnosticsText: String,
     onOpenUsage: () -> Unit,
     onNewMcpNameChange: (String) -> Unit,
     onNewMcpUrlChange: (String) -> Unit,
@@ -406,23 +399,15 @@ fun SettingsScreen(
                         }
                     }
                 }
-                SettingsTab.SERVER -> {
-                    item(key = "about") {
-                        val clipboard = LocalClipboardManager.current
-                        SettingsSection(title = "Server & diagnostics", icon = Icons.Filled.Dns) {
+                SettingsTab.STATS -> {
+                    item(key = "stats") {
+                        SettingsSection(title = "Stats", icon = Icons.Filled.PieChart) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable(onClick = onOpenUsage),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Filled.PieChart,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(text = "Usage stats", style = MaterialTheme.typography.bodyMedium)
                                     Text(
@@ -432,81 +417,12 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Server version: ${serverVersion ?: "unknown — Test & save first"}",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedButton(
-                                onClick = {
-                                    clipboard.setText(AnnotatedString("opencode serve --port 4096"))
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp)
-                            ) {
-                                Text("Copy Termux start command")
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Runs in Termux: opencode serve --port 4096 (or: opencode web --port 4096).",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedButton(
-                                onClick = { clipboard.setText(AnnotatedString(diagnosticsText)) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp)
-                            ) {
-                                Icon(Icons.Filled.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Copy diagnostics")
-                            }
-                        }
-                    }
-                    item(key = "about-app") {
-                        SettingsSection(title = "About", icon = Icons.Filled.Info) {
-                            AboutRow(label = "App", value = "Quark Code v0.1.0")
-                            AboutRow(label = "Package", value = "com.rg.quarkcode")
-                            AboutRow(label = "Backend", value = "opencode web/serve, on-device or remote")
-                            AboutRow(label = "Transport", value = "HTTP + SSE (no stdio)")
-                            AboutRow(label = "MCP", value = "Streamable HTTP only")
                         }
                     }
                 }
             }
             item(key = "bottom-space") { Spacer(modifier = Modifier.height(16.dp)) }
         }
-    }
-}
-
-@Composable
-private fun AboutRow(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.width(88.dp)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 

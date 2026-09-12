@@ -8,6 +8,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rg.quarkcode.backend.EventParser
+import com.rg.quarkcode.backend.CacheStore
+import com.rg.quarkcode.backend.CachedSnapshot
 import com.rg.quarkcode.backend.ModelRef
 import com.rg.quarkcode.backend.ModelStore
 import com.rg.quarkcode.backend.OpenCodeAgent
@@ -45,6 +47,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
     private var api: ServeApi? = null
     private var modelStore: ModelStore? = null
+    private var cacheStore: CacheStore? = null
     private var sessionId: String? = null
     private var pollJob: Job? = null
     private var eventJob: Job? = null
@@ -77,6 +80,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun attach(host: String, username: String, password: String) {
         api = ServeApi(host, username, password)
         modelStore = ModelStore(app)
+        cacheStore = CacheStore(app)
         chatPrefs = ChatPrefs(app)
         streamHost = host
         streamUser = username
@@ -105,6 +109,47 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         loadRecents()
         startEvents()
         drainOffline()
+        // Instant illusion: paint last-known chats + models now; live truth
+        // replaces them as soon as the backend answers.
+        viewModelScope.launch {
+            cacheStore?.loadSnapshot()?.let { applyCacheSnapshot(it) }
+        }
+    }
+
+    private fun applyCacheSnapshot(s: CachedSnapshot) {
+        if (s.selectedModelKey.contains('/')) {
+            val p = s.selectedModelKey.substringBefore('/')
+            val m = s.selectedModelKey.substringAfter('/')
+            if (p.isNotBlank() && m.isNotBlank() && m != "?") {
+                selProvider = p
+                selModel = m
+            }
+        }
+        uiState = uiState.copy(
+            recents = s.recents,
+            recentsError = null,
+            catalog = s.catalog,
+            hiddenModels = s.hiddenModels,
+            providers = s.providers,
+            selectedModelKey = s.selectedModelKey,
+            selectedProviderId = s.selectedProviderId,
+            model = s.modelLabel,
+            variants = s.variants
+        )
+    }
+
+    private fun saveCacheSnapshot() {
+        val snapshot = CachedSnapshot(
+            recents = uiState.recents,
+            catalog = uiState.catalog,
+            hiddenModels = uiState.hiddenModels,
+            providers = uiState.providers,
+            selectedModelKey = uiState.selectedModelKey,
+            selectedProviderId = uiState.selectedProviderId,
+            modelLabel = uiState.model,
+            variants = uiState.variants
+        )
+        viewModelScope.launch { cacheStore?.saveSnapshot(snapshot) }
     }
 
     fun setSendBehavior(value: String) {
@@ -204,6 +249,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             rebuildCatalog(snapshot?.hidden ?: emptySet())
             refreshSlashCatalog()
             loadAgents()
+            saveCacheSnapshot()
         }
     }
 
@@ -293,6 +339,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun onProviderChange(providerId: String) {
         val first = uiState.catalog.firstOrNull { it.providerId == providerId }?.id ?: return
         onModelChange(first)
+    }
+
+    // Adopts a session's tagged model when opening it (per-chat memory).
+    // Ignored when the tag isn't in the live catalog — never adopt blind.
+    private fun adoptSessionModel(providerId: String, modelId: String) {
+        if (providerId == selProvider && modelId == selModel) return
+        if (providers.none { it.id == providerId && it.models.containsKey(modelId) }) return
+        onModelChange("$providerId/$modelId")
     }
 
     fun onModeChange(mode: String) {
@@ -528,6 +582,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     if (uiState.project != title) uiState = uiState.copy(project = title)
                 }
             }
+            saveCacheSnapshot()
         }
     }
 
@@ -552,6 +607,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val mapped = (list ?: emptyList()).mapNotNull { it.toUiMessage() }
                 mapped.forEach { lastSeenIds.add(it.id) }
                 uiState = uiState.copy(sending = false, messages = mapped)
+                // Per-chat model memory: the backend tags every assistant
+                // message with its model — adopt the session's own so each
+                // chat keeps the model it was talking to.
+                (list ?: emptyList()).asReversed()
+                    .filter { it.info.role == "assistant" }
+                    .firstNotNullOfOrNull { msg ->
+                        msg.info.model?.takeIf {
+                            it.providerId.isNotBlank() && it.modelId.isNotBlank()
+                        }
+                    }?.let { adoptSessionModel(it.providerId, it.modelId) }
                 refreshTodos()
                 refreshCost(id)
             }.onFailure { err ->

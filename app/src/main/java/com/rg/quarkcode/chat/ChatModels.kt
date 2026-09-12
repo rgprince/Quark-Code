@@ -1,5 +1,7 @@
 package com.rg.quarkcode.chat
 
+import kotlinx.serialization.Serializable
+
 data class ChatRoute(val id: String)
 
 enum class Runtime {
@@ -15,6 +17,7 @@ data class ContextStats(
     val cost: Double = 0.0
 )
 
+@Serializable
 data class CatalogModel(
     val id: String,
     val label: String,
@@ -22,6 +25,7 @@ data class CatalogModel(
     val modelId: String = ""
 )
 
+@Serializable
 data class ProviderOption(
     val id: String,
     val name: String
@@ -39,6 +43,7 @@ data class AtFile(
     val name: String
 )
 
+@Serializable
 data class RecentSession(
     val id: String,
     val title: String

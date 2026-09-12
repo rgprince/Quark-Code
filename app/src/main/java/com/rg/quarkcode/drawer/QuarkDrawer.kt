@@ -17,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Difference
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -46,7 +45,6 @@ fun QuarkDrawer(
     onNewChat: () -> Unit,
     onOpenSession: (String) -> Unit,
     onOpenReview: () -> Unit,
-    onOpenSchedules: () -> Unit,
     onOpenSettings: () -> Unit,
     onRefreshRecents: () -> Unit = {}
 ) {
@@ -149,11 +147,6 @@ fun QuarkDrawer(
                     onClick = onOpenReview
                 )
             }
-            DrawerEntry(
-                label = "Schedules",
-                icon = { Icon(Icons.Filled.Schedule, contentDescription = null) },
-                onClick = onOpenSchedules
-            )
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             DrawerHeader(title = "System")

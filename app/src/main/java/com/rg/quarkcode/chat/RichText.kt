@@ -185,12 +185,12 @@ private fun parseRichText(src: String): List<RichBlock> {
 private val inlinePattern = Regex("""(`(.+?)`)|(\*\*(.+?)\*\*)|(~~(.+?)~~)|(\[([^\]]+)\]\(([^)]+)\))|(\*([^*\n]+?)\*)""")
 private val bareUrlPattern = Regex("""https?://[^\s)>\]]+""")
 
-private fun renderRichInline(text: String): AnnotatedString {
+private fun renderRichInline(text: String, linkColor: Color): AnnotatedString {
     return buildAnnotatedString {
         var rest = text
         while (rest.isNotEmpty()) {
             val m = inlinePattern.find(rest) ?: break
-            appendLinkified(rest.substring(0, m.range.first))
+            appendLinkified(rest.substring(0, m.range.first), linkColor)
             val code = m.groups[2]?.value
             val bold = m.groups[4]?.value
             val strike = m.groups[6]?.value
@@ -208,7 +208,7 @@ private fun renderRichInline(text: String): AnnotatedString {
                     SpanStyle(textDecoration = TextDecoration.LineThrough)
                 ) { append(strike) }
                 linkText != null -> {
-                    appendLink(linkText, linkHref.orEmpty())
+                    appendLink(linkText, linkHref.orEmpty(), linkColor)
                 }
                 italic != null -> withStyle(
                     SpanStyle(fontStyle = FontStyle.Italic)
@@ -216,11 +216,11 @@ private fun renderRichInline(text: String): AnnotatedString {
             }
             rest = rest.substring(m.range.last + 1)
         }
-        appendLinkified(rest)
+        appendLinkified(rest, linkColor)
     }
 }
 
-private fun AnnotatedString.Builder.appendLink(text: String, href: String) {
+private fun AnnotatedString.Builder.appendLink(text: String, href: String, linkColor: Color) {
     val url = href.trim()
     if (url.isEmpty()) {
         append(text)
@@ -229,6 +229,7 @@ private fun AnnotatedString.Builder.appendLink(text: String, href: String) {
     pushStringAnnotation("url", url)
     withStyle(
         SpanStyle(
+            color = linkColor,
             textDecoration = TextDecoration.Underline,
             fontWeight = FontWeight.Medium
         )
@@ -237,7 +238,7 @@ private fun AnnotatedString.Builder.appendLink(text: String, href: String) {
 }
 
 /** Auto-links bare https:// URLs inside plain runs (trailing punctuation trimmed). */
-private fun AnnotatedString.Builder.appendLinkified(text: String) {
+private fun AnnotatedString.Builder.appendLinkified(text: String, linkColor: Color) {
     var rest = text
     while (rest.isNotEmpty()) {
         val m = bareUrlPattern.find(rest) ?: break
@@ -245,7 +246,7 @@ private fun AnnotatedString.Builder.appendLinkified(text: String) {
         var url = m.value
         while (url.isNotEmpty() && url.last() in ".,;:!?") url = url.dropLast(1)
         val trailing = m.value.substring(url.length)
-        if (url.isNotEmpty()) appendLink(url, url)
+        if (url.isNotEmpty()) appendLink(url, url, linkColor)
         append(trailing)
         rest = rest.substring(m.range.last + 1)
     }
@@ -265,8 +266,9 @@ private fun RichInlineText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip
 ) {
-    val annotated = remember(text) {
-        runCatching { renderRichInline(text) }.getOrElse { AnnotatedString(text) }
+    val linkColor = MaterialTheme.colorScheme.primary
+    val annotated = remember(text, linkColor) {
+        runCatching { renderRichInline(text, linkColor) }.getOrElse { AnnotatedString(text) }
     }
     val hasLinks = remember(annotated) {
         annotated.getStringAnnotations("url", 0, annotated.length).isNotEmpty()

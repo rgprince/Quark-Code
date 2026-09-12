@@ -7,6 +7,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -18,6 +19,7 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import com.rg.quarkcode.backend.ConnectionStore
 import com.rg.quarkcode.backend.ThemeMode
 import com.rg.quarkcode.backend.ThemeStore
 import com.rg.quarkcode.chat.ChatRoute
@@ -29,18 +31,18 @@ import com.rg.quarkcode.settings.ProvidersScreen
 import com.rg.quarkcode.connect.ConnectScreen
 import com.rg.quarkcode.connect.ConnectViewModel
 import com.rg.quarkcode.drawer.QuarkDrawer
-import com.rg.quarkcode.schedules.SchedulesScreen
-import com.rg.quarkcode.schedules.SchedulesViewModel
 import com.rg.quarkcode.settings.SettingsScreen
 import com.rg.quarkcode.settings.SettingsViewModel
 import com.rg.quarkcode.theme.QuarkTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data object ConnectRoute
 private data object SettingsRoute
 private data object ProvidersRoute
 private data object UsageRoute
-private data object SchedulesRoute
 private data object DiffRoute
 
 @Composable
@@ -62,13 +64,24 @@ fun QuarkApp(modifier: Modifier = Modifier) {
 
 @Composable
 private fun QuarkNavHost(modifier: Modifier = Modifier) {
-    val backStack = remember { mutableStateListOf<Any>(ConnectRoute) }
+    // Chat first, always: the saved backend auto-attaches below, and the
+    // backend URL stays editable anytime in Settings → Connection.
+    val backStack = remember { mutableStateListOf<Any>(ChatRoute("local")) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val connectVm: ConnectViewModel = viewModel()
     val chatVm: ChatViewModel = viewModel()
     val settingsVm: SettingsViewModel = viewModel()
-    val schedulesVm: SchedulesViewModel = viewModel()
+
+    LaunchedEffect(Unit) {
+        val saved = runCatching {
+            withContext(Dispatchers.IO) { ConnectionStore(context.applicationContext).connection.first() }
+        }.getOrNull()
+        if (saved != null && !chatVm.uiState.connected) {
+            chatVm.attach(saved.host, saved.username, saved.password)
+        }
+    }
 
     fun openDrawer() {
         scope.launch { drawerState.open() }
@@ -106,10 +119,6 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                 onOpenReview = {
                     closeDrawer()
                     backStack.add(DiffRoute)
-                },
-                onOpenSchedules = {
-                    closeDrawer()
-                    backStack.add(SchedulesRoute)
                 },
                 onOpenSettings = {
                     closeDrawer()
@@ -217,27 +226,12 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onSendBehaviorChange = chatVm::setSendBehavior,
                                 autoSpeak = chatVm.uiState.autoSpeak,
                                 onAutoSpeakChange = chatVm::setAutoSpeak,
-                                serverVersion = settingsVm.uiState.serverVersion,
-                                diagnosticsText = settingsVm.diagnosticsText(),
                                 onOpenUsage = { backStack.add(UsageRoute) },
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,
                                 onToggleMcp = settingsVm::toggleMcp,
                                 onOpen = { settingsVm.loadAll() }
-                            )
-                        }
-                        is SchedulesRoute -> NavEntry(key) {
-                            SchedulesScreen(
-                                state = schedulesVm.uiState,
-                                onBack = { backStack.removeLastOrNull() },
-                                onAdd = { schedulesVm.startEditing() },
-                                onEdit = { schedulesVm.startEditing(it) },
-                                onEditingChange = schedulesVm::onEditChange,
-                                onCancelEditing = schedulesVm::cancelEditing,
-                                onSave = schedulesVm::saveEditing,
-                                onDelete = schedulesVm::delete,
-                                onToggle = schedulesVm::toggle
                             )
                         }
                         is DiffRoute -> NavEntry(key) {
