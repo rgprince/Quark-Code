@@ -48,6 +48,9 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         private set
     var debianVersion by mutableStateOf<String?>(null)
         private set
+    /** True readiness: marker AND a real debian tree (not just a saved label). */
+    var debianReady by mutableStateOf(false)
+        private set
     var opencodeVersion by mutableStateOf<String?>(null)
         private set
     var debianBytes by mutableStateOf(0L)
@@ -74,8 +77,10 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val prefs = withContext(Dispatchers.IO) { store.prefs.first() }
             val debVer = withContext(Dispatchers.IO) { DebianInstaller.installedVersion(app) }
+            val debReady = withContext(Dispatchers.IO) { DebianInstaller.isInstalled(app) }
             val ocPresent = withContext(Dispatchers.IO) { GuestOpencode.isInstalled(app) }
             debianVersion = debVer
+            debianReady = debReady
             opencodeVersion = prefs.opencodeVersion.takeIf { ocPresent }
             debianBytes = withContext(Dispatchers.IO) { RuntimeFiles.guestBytes(app) }
             opencodeBytes = withContext(Dispatchers.IO) {
@@ -130,6 +135,9 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
                 withContext(Dispatchers.IO) { store.setDebianVersion(asset.version) }
                 debianStages = debianStages.map { it.copy(state = StageState.DONE, fraction = 1f) }
                 refresh()
+                // Chain: a user who switched the backend on shouldn't tap
+                // through three menus — keep walking toward a running server.
+                if (enabled && !GuestOpencode.isInstalled(app)) downloadOpencode()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) {
                     debianStages = emptyList()
@@ -205,6 +213,8 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
                 withContext(Dispatchers.IO) { store.setOpencodeVersion(asset.version) }
                 opencodeStages = opencodeStages.map { it.copy(state = StageState.DONE, fraction = 1f) }
                 refresh()
+                // Chain: finish the job — start the server the user asked for.
+                if (enabled) start()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) {
                     opencodeStages = emptyList()
@@ -305,6 +315,18 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { store.setEnabled(value) }
             enabled = value
+            if (!value) {
+                stop()
+                return@launch
+            }
+            // Toggle ON means "make it run": walk the whole chain, skipping
+            // whatever is already in place. No dead toggles.
+            error = null
+            when {
+                !DebianInstaller.isInstalled(app) -> downloadDebian()
+                !GuestOpencode.isInstalled(app) -> downloadOpencode()
+                else -> start()
+            }
         }
     }
 

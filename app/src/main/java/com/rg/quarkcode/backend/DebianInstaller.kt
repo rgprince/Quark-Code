@@ -66,8 +66,21 @@ object DebianInstaller {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun installedVersion(context: Context): String? {
-        val marker = File(RuntimeFiles.guest(context), MARKER_NAME)
+    /** Short display version from asset names old and new
+     * (`debian-aarch64-pd-v4.9.0` → `v4.9.0`,
+     * `debian-trixie-aarch64-pd-v4.29.0` → `trixie v4.29.0`). */
+    fun debianVersionOf(fileName: String): String {
+        val base = fileName.removeSuffix(".tar.xz")
+        val tail = base.substringAfter("-pd-", base)
+        if (tail != base) {
+            val head = base.substringBefore("-pd-").removePrefix("debian-").removePrefix("debian")
+            val distro = head.substringBefore("-aarch64").trim('-')
+            return if (distro.isNotEmpty() && distro != "aarch64") "$distro $tail" else tail
+        }
+        return base
+    }
+
+    fun installedVersion(context: Context): String? {        val marker = File(RuntimeFiles.guest(context), MARKER_NAME)
         if (!marker.isFile) return null
         return marker.readText().trim().takeIf { it.isNotEmpty() }
     }
@@ -134,9 +147,7 @@ object DebianInstaller {
                 if (match != null) {
                     return ResolveOutcome.Hit(
                         DebianAsset(
-                            version = match.name
-                                .removePrefix("debian-aarch64-pd-")
-                                .removeSuffix(".tar.xz"),
+                            version = debianVersionOf(match.name),
                             fileName = match.name,
                             url = match.url,
                             size = match.size
@@ -161,6 +172,17 @@ object DebianInstaller {
     ) {
         val guest = RuntimeFiles.guest(context)
         report(STAGE_RESOLVE, 1f, asset.fileName)
+        if (isInstalled(context)) return
+        // Repair-first: a previous run may have extracted fine but left the
+        // tree nested (single top-level dir) or unconfigured — fixing that
+        // takes seconds and needs no re-download.
+        if (guest.isDirectory && (guest.listFiles()?.isNotEmpty() == true)) {
+            report(STAGE_CONFIGURE, 0.1f, "checking existing files…")
+            if (normalizeRootfs(guest) && File(guest, "etc/debian_version").isFile) {
+                withContext(Dispatchers.IO) { configureGuest(context, guest, asset.version, report) }
+                return
+            }
+        }
         // Download — resumable: a dead attempt restarts from the last byte,
         // and a complete tmp skips the network entirely.
         val tmp = File(RuntimeFiles.root(context), "debian.tmp")
@@ -182,20 +204,77 @@ object DebianInstaller {
             }
         }
         tmp.delete()
+        // Normalize: some rootfs tarballs nest everything one level deep —
+        // without this the marker saves but etc/debian_version is "missing".
+        withContext(Dispatchers.IO) {
+            normalizeRootfs(guest)
+            if (!File(guest, "etc/debian_version").isFile) {
+                error("Extracted system has no etc/debian_version — unsupported rootfs layout, see logs")
+            }
+        }
         // Configure: resolv.conf, CA bundle from system, workspace mount dir.
         withContext(Dispatchers.IO) {
-            report(STAGE_CONFIGURE, 0.3f, "network config…")
-            File(guest, "etc/resolv.conf").apply {
-                parentFile?.mkdirs()
-                writeText("nameserver 8.8.8.8\nnameserver 1.1.1.1\n")
-            }
-            report(STAGE_CONFIGURE, 0.6f, "certificates…")
-            copySystemCaBundle(guest)
-            File(guest, "workspace").mkdirs()
-            File(guest, "root/.opencode").mkdirs()
-            File(guest, MARKER_NAME).writeText(asset.version)
-            report(STAGE_CONFIGURE, 1f, "done")
+            configureGuest(context, guest, asset.version, report)
         }
+    }
+
+    private suspend fun configureGuest(
+        context: Context,
+        guest: File,
+        version: String,
+        report: suspend (stage: String, fraction: Float, detail: String) -> Unit
+    ) {
+        report(STAGE_CONFIGURE, 0.3f, "network config…")
+        File(guest, "etc/resolv.conf").apply {
+            parentFile?.mkdirs()
+            writeText("nameserver 8.8.8.8\nnameserver 1.1.1.1\n")
+        }
+        report(STAGE_CONFIGURE, 0.6f, "certificates…")
+        copySystemCaBundle(guest)
+        File(guest, "workspace").mkdirs()
+        File(guest, "root/.opencode").mkdirs()
+        File(guest, MARKER_NAME).writeText(version)
+        report(STAGE_CONFIGURE, 1f, "done")
+    }
+
+    /**
+     * Lifts a nested tree (`guest/<something>/etc/...`) up to `guest/`.
+     * Returns true when `etc/debian_version` ends up in place.
+     */
+    fun normalizeRootfs(guest: File): Boolean {
+        if (File(guest, "etc/debian_version").isFile) return true
+        val dirs = guest.listFiles { f -> f.isDirectory }?.toList() ?: return false
+        val holder = dirs.firstOrNull { File(it, "etc/debian_version").isFile }
+            ?: dirs.firstOrNull { File(it, "bin").isDirectory && File(it, "usr").isDirectory }
+            ?: return false
+        holder.listFiles()?.forEach { child ->
+            val dest = File(guest, child.name)
+            if (dest.exists()) {
+                if (dest.isDirectory && child.isDirectory) {
+                    mergeDirs(child, dest)
+                } else {
+                    dest.deleteRecursively()
+                    child.renameTo(dest)
+                }
+            } else {
+                child.renameTo(dest)
+            }
+        }
+        runCatching { if (holder.listFiles()?.isEmpty() != false) holder.delete() }
+        return File(guest, "etc/debian_version").isFile
+    }
+
+    private fun mergeDirs(from: File, into: File) {
+        from.listFiles()?.forEach { child ->
+            val dest = File(into, child.name)
+            if (dest.exists() && dest.isDirectory && child.isDirectory) {
+                mergeDirs(child, dest)
+            } else {
+                if (dest.exists()) dest.deleteRecursively()
+                child.renameTo(dest)
+            }
+        }
+        runCatching { from.delete() }
     }
 
     private fun copySystemCaBundle(guest: File) {

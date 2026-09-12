@@ -95,14 +95,18 @@ fun DeviceBackendPanel(
 
         // ---- Section 1: Debian system ----
         DeviceSectionCard(title = "1 · Linux system (Debian)") {
-            if (vm.debianVersion != null) {
-                Text(
+            when {
+                vm.debianReady -> Text(
                     text = "Debian ${vm.debianVersion} · ${formatBytes(vm.debianBytes)} on disk",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            } else {
-                Text(
+                vm.debianVersion != null -> Text(
+                    text = "Installation incomplete (files present but system not verified) — tap below to repair, no re-download needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+                else -> Text(
                     text = "The Linux home the server and tools live in (~150–250 MB, Wi-Fi recommended).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -120,12 +124,12 @@ fun DeviceBackendPanel(
                     ) {
                         Text("Cancel")
                     }
-                } else if (vm.debianVersion == null) {
+                } else if (!vm.debianReady) {
                     Button(
                         onClick = vm::downloadDebian,
                         modifier = Modifier.weight(1f).height(48.dp)
                     ) {
-                        Text("Download Debian")
+                        Text(if (vm.debianVersion != null) "Repair install" else "Download Debian")
                     }
                 } else {
                     OutlinedButton(
@@ -168,7 +172,7 @@ fun DeviceBackendPanel(
                 } else if (vm.opencodeVersion == null) {
                     Button(
                         onClick = vm::downloadOpencode,
-                        enabled = vm.debianVersion != null,
+                        enabled = vm.debianReady,
                         modifier = Modifier.weight(1f).height(48.dp)
                     ) {
                         Text("Download opencode")

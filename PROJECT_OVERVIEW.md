@@ -196,6 +196,13 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8.2 scope — honest installer + one-toggle flow
+- [x] Fixed the lying green checkmarks: nested trixie trees are normalized,
+  readiness = marker AND etc/debian_version, incomplete installs get Repair
+- [x] One toggle does everything: ON walks debian → opencode → start,
+  OFF stops; each step auto-chains when enabled
+- [x] v0.12.0 (code 12), same dummy key — `adb install -r` updates
+
 ## V8.1 scope — installer honesty + settings fill
 - [x] Resolve tells the truth: rate-limit/HTTP/empty/parse errors surfaced
   verbatim, 30-release scan, loose-name second pass, candidates logged
