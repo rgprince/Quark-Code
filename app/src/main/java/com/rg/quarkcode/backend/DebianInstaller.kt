@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 
 @Serializable
 private data class DistroAsset(
@@ -103,7 +104,7 @@ object DebianInstaller {
                 size = match.size
             )
         }
-        null
+        return null
     }
 
     suspend fun install(
@@ -132,7 +133,7 @@ object DebianInstaller {
                         val buf = ByteArray(256 * 1024)
                         var done = 0L
                         while (true) {
-                            kotlinx.coroutines.ensureActive()
+                            coroutineContext.ensureActive()
                             val n = input.read(buf)
                             if (n < 0) break
                             output.write(buf, 0, n)

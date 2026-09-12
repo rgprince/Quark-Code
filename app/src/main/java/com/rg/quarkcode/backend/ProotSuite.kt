@@ -11,7 +11,7 @@ import java.io.File
  */
 class ProotSuite(
     private val context: Context,
-    runtimeDir: File
+    private val runtimeDir: File
 ) {
     data class Paths(
         val home: File,
