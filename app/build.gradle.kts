@@ -59,8 +59,9 @@ android {
 
     sourceSets {
         getByName("main") {
+            // Parent of the per-ABI dirs (AGP expects <srcDir>/<abi>/lib*.so).
             jniLibs.srcDir(
-                layout.buildDirectory.dir("generated/proot-jnilibs/arm64-v8a")
+                layout.buildDirectory.dir("generated/proot-jnilibs")
                     .get().asFile.absolutePath
             )
         }
