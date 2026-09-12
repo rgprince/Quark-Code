@@ -636,8 +636,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             messages = uiState.messages.filterNot { message ->
                 message.parts.filterIsInstance<ChatPart.Error>().isNotEmpty() && !message.isUser
             } + userMessage,
-            stats = uiState.stats.copy(used = uiState.stats.used + estimateTokens(text)),
-            project = if (sessionId == null) text.take(60) else uiState.project
+            stats = uiState.stats.copy(used = uiState.stats.used + estimateTokens(text))
+            // project stays "New chat" until the server generates a title and
+            // loadRecents syncs it — never the raw typed text.
         )
         pollJob = viewModelScope.launch {
             val idsBeforeSend = lastSeenIds.toSet()

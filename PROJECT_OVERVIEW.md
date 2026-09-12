@@ -196,6 +196,17 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V6.3 scope — thought fallback, chat-name bar, plain tool words, flat todos
+- [x] Thought line actually appears now: falls back to transcript reasoning
+  (old chats never run the live timer) — `Thought` without time when no
+  timing, `Thought · 16ms` when timed
+- [x] Top bar: folder chip gone — plain chat-name title (tap opens drawer),
+  "New chat" until the server generates a title (no more raw typed text)
+- [x] Tool rows: terminal glyph in variant tone, plain "3 tool calls" /
+  "Changed 2 files" wording (jargon summary kept as sheet title only)
+- [x] Todos flat: one card, 17dp check dots, tight rows (checkboxes removed)
+- [x] v0.6.0 (code 6), same dummy key — `adb install -r` updates
+
 ## V6.2 scope — thought-line revert + slim tools (user feedback)
 - [x] "Thought N time(s)" card removed; old italic thought-line back, now
   tertiary with side bar, `Thought · 16ms` format just above the reply

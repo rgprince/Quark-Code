@@ -135,10 +135,11 @@ fun MessageList(
                         modifier = Modifier.animateItem()
                     )
                     // Think-then-reply order: the thought line belongs right
-                    // after the prompt it answered. Shown regardless of the
-                    // live `thinking` flag so it survives flicker and newer
-                    // turns (no more vanishes when a follow-up is queued).
-                    if (index == lastUserIndex && thoughtMs != null) {
+                    // after the prompt it answered. Shown when the live timer
+                    // recorded a phase OR when the transcript itself holds
+                    // reasoning — old chats never run the timer, so without
+                    // this fallback the line never appears for them.
+                    if (index == lastUserIndex && (thoughtMs != null || thoughtText.isNotBlank())) {
                         ThoughtDoneRow(
                             ms = thoughtMs,
                             text = thoughtText,
@@ -348,7 +349,7 @@ fun MessageList(
 // tap expands the reasoning text.
 @Composable
 private fun ThoughtDoneRow(
-    ms: Long,
+    ms: Long?,
     text: String,
     expanded: Boolean,
     onToggle: () -> Unit,
@@ -371,7 +372,7 @@ private fun ThoughtDoneRow(
                     .background(MaterialTheme.colorScheme.tertiary)
             )
             Text(
-                text = "Thought · ${formatDuration(ms)}",
+                text = if (ms != null) "Thought · ${formatDuration(ms)}" else "Thought",
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontStyle = FontStyle.Italic
                 ),

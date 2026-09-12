@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
@@ -97,19 +96,20 @@ fun AssistantActivityRow(
                 )
             } else {
                 Icon(
-                    imageVector = if (hasError) Icons.Filled.ErrorOutline else Icons.Filled.AutoAwesome,
+                    imageVector = if (hasError) Icons.Filled.ErrorOutline else Icons.Filled.Terminal,
                     contentDescription = null,
                     tint = if (hasError) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     },
                     modifier = Modifier.size(15.dp)
                 )
             }
             Text(
-                text = (if (running) "Working… " else "") + summarizeActivity(parts),
+                text = if (running) "Working…" else plainActivityLabel(parts),
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -136,6 +136,17 @@ fun AssistantActivityRow(
             }
         }
     }
+}
+
+// Plain-words label for the collapsed row: "3 tool calls", "Changed 2 files".
+// (The jargon-y "Ran 3 · read 2 · edit 1" summary still titles the sheet.)
+private fun plainActivityLabel(parts: List<ChatPart>): String {
+    val tools = parts.filterIsInstance<ChatPart.Tool>()
+    val patches = parts.filterIsInstance<ChatPart.Patch>().size
+    if (tools.isEmpty() && patches > 0) {
+        return if (patches == 1) "Changed 1 file" else "Changed $patches files"
+    }
+    return if (tools.size == 1) "1 tool call" else "${tools.size} tool calls"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
