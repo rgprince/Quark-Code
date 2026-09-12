@@ -153,11 +153,12 @@ def main():
 
             def matches(name, pattern):
                 # Termux debs prefix everything with
-                # ./data/data/com.termux/files/ — match on the tail.
+                # ./data/data/com.termux/files/ — match on the tail,
+                # wildcards included.
                 clean = name[2:] if name.startswith("./") else name
-                if "/" in pattern:
-                    return clean == pattern or clean.endswith("/" + pattern)
-                return fnmatch.fnmatch(clean, pattern) or fnmatch.fnmatch(name, pattern)
+                return (fnmatch.fnmatch(clean, pattern) or
+                        fnmatch.fnmatch(clean, "*/" + pattern) or
+                        fnmatch.fnmatch(name, pattern))
 
             hit = [n for n in names if matches(n, pat)]
             if not hit:
