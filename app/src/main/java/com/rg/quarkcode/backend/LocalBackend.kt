@@ -125,7 +125,12 @@ object LocalBackend {
             val store = RuntimeStore(context.applicationContext)
             val password = store.password()
             val cmd = guestBase(context, suite)
-            cmd.addAll(listOf(GuestOpencode.GUEST_BIN, "serve", "--port", PORT.toString(), "--hostname", "127.0.0.1"))
+            // v0.0.55 (opencode-ai, Go) has `serve` but NO --port/--hostname
+            // flags — and its defaults are already 4096 + 127.0.0.1. Newer
+            // sst/opencode accepts the flags but doesn't need them either,
+            // so run bare `serve` for compat with what you already
+            // downloaded (no re-download on limited internet).
+            cmd.addAll(listOf(GuestOpencode.GUEST_BIN, "serve"))
             val pb = ProcessBuilder(cmd)
             pb.directory(RuntimeFiles.workspace(context))
             pb.redirectErrorStream(true)
@@ -133,7 +138,7 @@ object LocalBackend {
             env.clear()
             env.putAll(guestEnv(context, suite, password))
             _state.value = State.Starting
-            appendLog("$ opencode serve --port $PORT (official, Debian guest)")
+            appendLog("$ opencode serve (official, Debian guest)")
             val proc = pb.start()
             process = proc
             thread(isDaemon = true, name = "opencode-log") {
@@ -226,9 +231,16 @@ object LocalBackend {
         .build()
 
     private fun checkHealth(password: String): Boolean {
+        // New server: /global/health. Old v0.0.55 Go server: /health.
+        // Try both so existing downloads keep working.
+        return checkUrl(password, "http://127.0.0.1:$PORT/global/health") ||
+            checkUrl(password, "http://127.0.0.1:$PORT/health")
+    }
+
+    private fun checkUrl(password: String, url: String): Boolean {
         return try {
             val request = Request.Builder()
-                .url("http://127.0.0.1:$PORT/global/health")
+                .url(url)
                 .header("Accept", "application/json")
                 .header("Authorization", Credentials.basic(USERNAME, password))
                 .get()
