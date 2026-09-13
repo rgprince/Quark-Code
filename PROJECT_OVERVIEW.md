@@ -196,6 +196,18 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8.3 scope — proot libtalloc link fix (screenshot bug)
+- [x] Root cause: AGP only packages `*.so` from jniLibs, so the SONAME-exact
+  `libtalloc.so.2` never reached nativeLibraryDir — linker died with
+  `CANNOT LINK EXECUTABLE ... "libtalloc.so.2" not found`, surfacing as
+  `Cannot run program .../libquark_proot.so`, `Server process died during
+  startup`, and `ripgrep install failed` (all guest commands share proot)
+- [x] Fix: `ProotSuite` self-heals at runtime — materializes versioned names
+  into `files/backend/proot-suite/libs/` from the unversioned `*.so` copies
+  that DO survive in the APK (same bytes), LD_LIBRARY_PATH now
+  `libsDir:nativeLibraryDir`
+- [x] v0.12.1 (code 13), same dummy key — `adb install -r` updates
+
 ## V8.2 scope — honest installer + one-toggle flow
 - [x] Fixed the lying green checkmarks: nested trixie trees are normalized,
   readiness = marker AND etc/debian_version, incomplete installs get Repair
