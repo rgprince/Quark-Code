@@ -128,6 +128,17 @@ object LocalBackend {
             RuntimeFiles.ensureDirs(context)
             val store = RuntimeStore(context.applicationContext)
             val password = store.password()
+            // Dead-binary guard: v0.0.x (archived Go repo) has no server
+            // mode — launching it only prints usage. Fail fast with the
+            // fix instead of a cryptic log.
+            val installedVersion = runCatching { store.prefs.first().opencodeVersion }.getOrNull()
+            if (installedVersion != null && installedVersion.startsWith("0.0")) {
+                _state.value = State.Stopped(
+                    "opencode v$installedVersion can't run a server — " +
+                        "Device → Check for opencode update (v${GuestOpencode.PINNED_TAG})"
+                )
+                return@withContext false
+            }
             // Same-backend rule: if something already answers on 4096
             // (stale process, manual start, previous run we lost track of),
             // adopt it instead of grabbing the port and dying with EADDRINUSE.

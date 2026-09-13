@@ -196,6 +196,16 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8.5 scope — pinned stable binary (no more 0.0.55, no latest-churn)
+- [x] Why re-download kept giving 0.0.55: APK still pointed at the
+  archived opencode-ai repo AND retries reused the cached 0.0.x asset —
+  both fixed. Resolve now hits the pinned tag
+  `sst/opencode@v1.18.25` (stable per user, not latest 1.18.30)
+- [x] Stale cached assets (opencode-ai URL or 0.0.x) are dropped before
+  reuse; old binary is wiped on install; start refuses 0.0.x with the
+  exact fix ("Device → Check for opencode update")
+- [x] v0.13.1 (code 15), same dummy key — `adb install -r` updates
+
 ## V8.4 scope — real server binary + copyable logs + port adoption
 - [x] New error decoded from screenshots: `Error: agent coder not found`
   with only `-c/-p/-f/-q/-v` flags = v0.0.55 (opencode-ai Go, archived)

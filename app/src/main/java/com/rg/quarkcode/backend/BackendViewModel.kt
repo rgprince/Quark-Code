@@ -195,6 +195,19 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
                 opencodeStages = setStage(opencodeStages, GuestOpencode.STAGE_RESOLVE, StageState.ACTIVE)
                 // Update checks bypass the cached asset so they see upstream.
                 if (checkUpdate) withContext(Dispatchers.IO) { store.clearOpencodeAsset() }
+                // Migration: cached 0.0.x assets point at the archived
+                // opencode-ai repo (no server mode). Drop them so retry
+                // actually fetches the pinned sst build instead of
+                // re-installing the same dead binary.
+                withContext(Dispatchers.IO) {
+                    val stale = store.cachedOpencodeAsset()
+                    if (stale != null &&
+                        (stale.url.contains("opencode-ai/opencode") ||
+                            stale.version.startsWith("0.0"))
+                    ) {
+                        store.clearOpencodeAsset()
+                    }
+                }
                 val asset = withContext(Dispatchers.IO) { store.cachedOpencodeAsset() }
                     ?: withContext(Dispatchers.IO) {
                         GuestOpencode.resolve().also { store.saveOpencodeAsset(it) }

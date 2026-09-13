@@ -54,8 +54,13 @@ object GuestOpencode {
 
     const val GUEST_BIN = "/root/.opencode/bin/opencode"
 
-    private const val LATEST_URL =
-        "https://api.github.com/repos/sst/opencode/releases/latest"
+    // Pinned stable — NOT latest.latest (1.18.30) moves under our feet and
+    // re-downloads ~150 MB on every bump; 1.18.25 is the user-approved
+    // stable. Bump PINNED_TAG deliberately, never silently.
+    const val PINNED_TAG = "v1.18.25"
+
+    private const val PINNED_URL =
+        "https://api.github.com/repos/sst/opencode/releases/tags/v1.18.25"
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -75,7 +80,7 @@ object GuestOpencode {
     /** Throws with a human-readable reason — the UI shows it verbatim. */
     suspend fun resolve(): OpencodeAsset = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url(LATEST_URL)
+            .url(PINNED_URL)
             .header("User-Agent", "Quark-Code")
             .header("Accept", "application/vnd.github+json")
             .get()
@@ -101,7 +106,7 @@ object GuestOpencode {
         if (match == null) {
             val names = release.assets.map { it.name }.take(10)
             LocalBackend.appendLog("resolve: opencode assets: ${names.joinToString(", ")}")
-            error("Latest opencode has no linux-arm64 build listed.")
+            error("Pinned opencode $PINNED_TAG has no linux-arm64 build listed.")
         }
         OpencodeAsset(
             version = release.tag.trim().removePrefix("v").ifBlank { "unknown" },
