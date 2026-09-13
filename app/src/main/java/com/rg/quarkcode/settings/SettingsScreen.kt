@@ -97,8 +97,6 @@ fun SettingsScreen(
     onShowTimestampsChange: (Boolean) -> Unit,
     sendBehavior: String,
     onSendBehaviorChange: (String) -> Unit,
-    autoSpeak: Boolean,
-    onAutoSpeakChange: (Boolean) -> Unit,
     autoScroll: Boolean,
     onAutoScrollChange: (Boolean) -> Unit,
     playfulStatus: Boolean,
@@ -358,12 +356,6 @@ fun SettingsScreen(
                                 onCheckedChange = onDetailedChange
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            ChatToggle(
-                                title = "Read replies aloud",
-                                subtitle = "Auto speak newest answer (speaker icon replays)",
-                                checked = autoSpeak,
-                                onCheckedChange = onAutoSpeakChange
-                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier

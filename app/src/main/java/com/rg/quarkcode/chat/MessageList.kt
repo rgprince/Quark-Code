@@ -31,14 +31,11 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,7 +75,6 @@ fun MessageList(
     comfortable: Boolean = false,
     showTimestamps: Boolean = true,
     thinkingSecs: Int = 0,
-    speakingId: String?,
     thoughtMs: Long? = null,
     thoughtText: String = "",
     thoughtExpanded: Boolean = false,
@@ -94,8 +90,7 @@ fun MessageList(
     onDeny: (String) -> Unit = {},
     onRememberChange: (String, Boolean) -> Unit = { _, _ -> },
     onRetry: (String) -> Unit = {},
-    onAnswer: (String, String) -> Unit = { _, _ -> },
-    onSpeak: (String, String) -> Unit = { _, _ -> }
+    onAnswer: (String, String) -> Unit = { _, _ -> }
 ) {
     val timeline = remember(messages) { groupConversationTimeline(messages) }
     var sheetGroupId by remember { mutableStateOf<String?>(null) }
@@ -275,7 +270,7 @@ fun MessageList(
                 )
                 is TimelineEntry.Footer -> {
                     val showTime = showTimestamps && entry.timestamp > 0L
-                    if (entry.text.isNotBlank() || showTime) {
+                    if (showTime) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -283,27 +278,11 @@ fun MessageList(
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                    if (entry.text.isNotBlank()) {
-                        val speaking = speakingId == entry.id
-                        IconButton(
-                            onClick = { onSpeak(entry.id, entry.text) },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (speaking) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
-                                contentDescription = if (speaking) "Stop readout" else "Read aloud",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    if (showTime) {
-                        Text(
-                            text = formatTime(entry.timestamp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = formatTime(entry.timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 }
                 }

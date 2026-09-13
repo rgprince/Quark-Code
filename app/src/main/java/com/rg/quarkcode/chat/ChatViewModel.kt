@@ -1,7 +1,6 @@
 package com.rg.quarkcode.chat
 
 import android.app.Application
-import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -69,7 +68,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val messageQueue = mutableListOf<String>()
     private val offlineQueue = mutableListOf<String>()
     private var atJob: Job? = null
-    private var tts: TextToSpeech? = null
     private var usageJob: Job? = null
 
     var usageState by mutableStateOf(UsageState())
@@ -100,7 +98,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 uiState = uiState.copy(
                     detailedTools = prefs.detailed,
                     sendBehavior = prefs.sendBehavior,
-                    autoSpeak = prefs.autoSpeak,
                     textScale = prefs.textScale,
                     autoScroll = prefs.autoScroll,
                     playfulStatus = prefs.playfulStatus,
@@ -725,7 +722,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startRun(text: String) {
         pollJob?.cancel()
-        stopSpeak()
         ignoreIdleUntil = System.currentTimeMillis() + 4000L
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
@@ -1267,53 +1263,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         refreshAtSuggestions(joined)
     }
 
-    // ---- TTS readout (kai9000 IA, framework engine — no new deps) ----
-
-    fun setAutoSpeak(value: Boolean) {
-        uiState = uiState.copy(autoSpeak = value)
-        if (!value) stopSpeak()
-        viewModelScope.launch { chatPrefs?.setAutoSpeak(value) }
-    }
-
-    fun speakNow(id: String, text: String) {
-        val clean = AtMentions.speakable(text)
-        if (clean.isEmpty()) return
-        if (tts == null) {
-            tts = TextToSpeech(app, { status ->
-                if (status == TextToSpeech.SUCCESS) speakNow(id, text)
-            })
-            tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) = Unit
-                override fun onDone(utteranceId: String?) {
-                    viewModelScope.launch {
-                        if (uiState.speakingId == utteranceId) {
-                            uiState = uiState.copy(speakingId = null)
-                        }
-                    }
-                }
-                override fun onError(utteranceId: String?) {
-                    viewModelScope.launch {
-                        if (uiState.speakingId == utteranceId) {
-                            uiState = uiState.copy(speakingId = null)
-                        }
-                    }
-                }
-            })
-            return
-        }
-        tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id)
-        uiState = uiState.copy(speakingId = id)
-    }
-
-    fun toggleSpeak(id: String, text: String) {
-        if (uiState.speakingId == id) stopSpeak() else speakNow(id, text)
-    }
-
-    fun stopSpeak() {
-        tts?.stop()
-        if (uiState.speakingId != null) uiState = uiState.copy(speakingId = null)
-    }
-
     fun setModelSheet(open: Boolean) {
         uiState = uiState.copy(modelSheet = open)
     }
@@ -1673,7 +1622,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         pollJob?.cancel()
         eventJob?.cancel()
         atJob?.cancel()
-        tts?.shutdown()
         super.onCleared()
     }
 }

@@ -18,7 +18,6 @@ class ChatPrefs(private val context: Context) {
     private object Keys {
         val DETAILED_TOOLS = booleanPreferencesKey("detailed_tools")
         val SEND_BEHAVIOR = stringPreferencesKey("send_behavior")
-        val AUTO_SPEAK = booleanPreferencesKey("auto_speak")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val AUTO_SCROLL = booleanPreferencesKey("auto_scroll")
         val PLAYFUL_STATUS = booleanPreferencesKey("playful_status")
@@ -30,7 +29,6 @@ class ChatPrefs(private val context: Context) {
     data class Prefs(
         val detailed: Boolean = false,
         val sendBehavior: String = "interrupt",
-        val autoSpeak: Boolean = false,
         val textScale: Float = 1f,
         val autoScroll: Boolean = true,
         val playfulStatus: Boolean = true,
@@ -43,7 +41,6 @@ class ChatPrefs(private val context: Context) {
         Prefs(
             detailed = it[Keys.DETAILED_TOOLS] == true,
             sendBehavior = it[Keys.SEND_BEHAVIOR] ?: "interrupt",
-            autoSpeak = it[Keys.AUTO_SPEAK] == true,
             textScale = (it[Keys.TEXT_SCALE] ?: 1f).coerceIn(0.8f, 1.3f),
             autoScroll = it[Keys.AUTO_SCROLL] ?: true,
             playfulStatus = it[Keys.PLAYFUL_STATUS] ?: true,
@@ -59,10 +56,6 @@ class ChatPrefs(private val context: Context) {
 
     suspend fun setSendBehavior(value: String) {
         context.chatPrefsDataStore.edit { it[Keys.SEND_BEHAVIOR] = value }
-    }
-
-    suspend fun setAutoSpeak(value: Boolean) {
-        context.chatPrefsDataStore.edit { it[Keys.AUTO_SPEAK] = value }
     }
 
     suspend fun setTextScale(value: Float) {

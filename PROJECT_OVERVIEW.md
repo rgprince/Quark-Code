@@ -74,7 +74,7 @@ Debug APK is 65M (unoptimized); release target stays <25M via R8/minify.
 - [x] Model visibility: hide eye in Show-all mode, Hidden section to unhide, `ModelStore.hidden`, pick unhides
 
 ## V4.4 batch — voice, @ mentions, server info (subagent research)
-- [x] Voice, framework-only (kai9000 has NO vosk/mic/wake code — TTS-output only via unapproved KMP lib): mic button + `RecognizerIntent` transcript insert (`RECORD_AUDIO`), framework `TextToSpeech` readout (per-message speaker in footer, auto-speak toggle, markdown-stripped, stops on send)
+- [x] Voice, framework-only: mic button + `RecognizerIntent` transcript insert (`RECORD_AUDIO` kept). `TextToSpeech` readout REMOVED 2026-09-13 (speaker footer + auto-speak toggle + `speakable()` deleted — freed Settings row + VM/state/prefs; mic voice-input untouched)
 - [x] `@` file mentions (aionui IA): `GET find/file` ranked popup, insert literal `@path` (server resolves natively); and-code/kai9000 confirmed no @ mapping
 - [x] Server info screen: version, `GET`/`PATCH config` editor, providers/commands/skills lists; diagnostics upgraded (app version, memory, storage). No log viewer exists upstream — no endpoint to wire
 
@@ -196,11 +196,16 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8.6 scope — Read Aloud purge + resolve hardening (screenshot bug)
+- [x] Screenshot `Pinned opencode v1.18.25 has no linux-arm64 build listed` was a stale APK (old `sst/opencode .zip-only` filter); tree already resolves `anomalyco tar.gz`. Hardened with tolerant fallback (exact tarball → any linux-arm64 tarball → legacy zip) + full error text (320 chars, cache cleared on resolve fail)
+- [x] Read Aloud removed end-to-end (user: chat clutter): `onSpeak`/speaker `48dp` footer gone, `autoSpeak/speakingId` state + `AUTO_SPEAK` prefs + `speakable()` + TTS VM block deleted, Settings `Read replies aloud` row gone; `RECORD_AUDIO` + mic `RecognizerIntent` kept
+- [x] v0.13.2 (code 16), same dummy key — `adb install -r` updates
+
 ## V8.5 scope — pinned stable binary (no more 0.0.55, no latest-churn)
 - [x] Why re-download kept giving 0.0.55: APK still pointed at the
   archived opencode-ai repo AND retries reused the cached 0.0.x asset —
   both fixed. Resolve now hits the pinned tag
-  `sst/opencode@v1.18.25` (stable per user, not latest 1.18.30)
+  `anomalyco/opencode@v1.18.25` (stable per user, not latest 1.18.30; sst/opencode renamed to anomalyco)
 - [x] Stale cached assets (opencode-ai URL or 0.0.x) are dropped before
   reuse; old binary is wiped on install; start refuses 0.0.x with the
   exact fix ("Device → Check for opencode update")
@@ -210,9 +215,9 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] New error decoded from screenshots: `Error: agent coder not found`
   with only `-c/-p/-f/-q/-v` flags = v0.0.55 (opencode-ai Go, archived)
   has NO `serve`/`web` mode at all — the old 42 MB binary can never be
-  the backend, one ~150 MB re-download to sst/opencode (v1.x,
-  `opencode-linux-arm64.zip`) is unavoidable
-- [x] `GuestOpencode` now resolves `sst/opencode/releases/latest`,
+  the backend, one ~60 MB re-download to anomalyco/opencode (v1.x,
+  `opencode-linux-arm64.tar.gz`) is unavoidable
+- [x] `GuestOpencode` now resolves `anomalyco/opencode pinned v1.18.25`,
   new `GuestArchive.extractZip` (traversal-guarded, exec bit kept),
   old Go binary wiped before extract so it can't shadow the new one
 - [x] `serve --port 4096 --hostname 127.0.0.1` restored (v1.x supports

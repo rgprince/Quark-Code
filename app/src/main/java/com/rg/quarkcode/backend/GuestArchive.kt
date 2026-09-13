@@ -35,7 +35,7 @@ object GuestArchive {
         }
     }
 
-    /** sst/opencode ships `opencode-linux-arm64.zip` (single binary). */
+    /** anomalyco/opencode ships `opencode-linux-arm64.tar.gz` (single binary). Zip kept as legacy fallback. */
     suspend fun extractZip(
         input: InputStream,
         dest: File,

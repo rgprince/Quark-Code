@@ -212,7 +212,6 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                     chatVm.insertAtFile(file.path)
                                 },
                                 onVoiceResult = chatVm::appendVoiceResult,
-                                onSpeak = chatVm::toggleSpeak,
                                 onDismissTodos = chatVm::dismissTodos,
                                 onOpenSettings = { backStack.add(SettingsRoute) },
                                 onMenu = { openDrawer() }
@@ -259,8 +258,6 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onShowTimestampsChange = chatVm::setShowTimestamps,
                                 sendBehavior = chatVm.uiState.sendBehavior,
                                 onSendBehaviorChange = chatVm::setSendBehavior,
-                                autoSpeak = chatVm.uiState.autoSpeak,
-                                onAutoSpeakChange = chatVm::setAutoSpeak,
                                 autoScroll = chatVm.uiState.autoScroll,
                                 onAutoScrollChange = chatVm::setAutoScroll,
                                 playfulStatus = chatVm.uiState.playfulStatus,

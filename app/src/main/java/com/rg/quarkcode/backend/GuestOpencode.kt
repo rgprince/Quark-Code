@@ -36,14 +36,13 @@ data class OpencodeAsset(
 
 /**
  * Official opencode installer — untouched upstream bits
- * (sst/opencode releases, `opencode-linux-arm64.zip`), extracted
+ * (anomalyco/opencode releases, `opencode-linux-arm64.tar.gz`), extracted
  * on the HOST straight into the guest tree. No guest network needed for
  * this step and no middleman builds, so updates track upstream day-zero.
  *
- * NOTE: opencode-ai/opencode (v0.0.55, Go, archived Sep 2025) has NO
- * `serve`/`web` subcommand — bare `serve` fails with
- * "agent coder not found". Only sst/opencode (v1.x, Bun/TS) can be the
- * backend, so old installs MUST update (one ~150 MB re-download).
+ * NOTE: sst/opencode (and opencode-ai/opencode v0.0.55, Go, archived) are
+ * dead ends — bare `serve` fails with "agent coder not found". Only
+ * anomalyco/opencode (v1.x, Bun/TS) can be the backend.
  */
 object GuestOpencode {
 
@@ -54,13 +53,13 @@ object GuestOpencode {
 
     const val GUEST_BIN = "/root/.opencode/bin/opencode"
 
-    // Pinned stable — NOT latest.latest (1.18.30) moves under our feet and
-    // re-downloads ~150 MB on every bump; 1.18.25 is the user-approved
+    // Pinned stable — NOT latest. Latest (1.18.30) moves under our feet and
+    // re-downloads ~60 MB on every bump; 1.18.25 is the user-approved
     // stable. Bump PINNED_TAG deliberately, never silently.
     const val PINNED_TAG = "v1.18.25"
 
     private const val PINNED_URL =
-        "https://api.github.com/repos/sst/opencode/releases/tags/v1.18.25"
+        "https://api.github.com/repos/anomalyco/opencode/releases/tags/v1.18.25"
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -99,14 +98,29 @@ object GuestOpencode {
         }
         val release = runCatching { json.decodeFromString<OcRelease>(text) }.getOrNull()
             ?: error("opencode release list was unreadable.")
-        // sst/opencode ships per-arch zips: opencode-linux-arm64.zip.
+        // anomalyco/opencode ships per-arch tarballs:
+        // `opencode-linux-arm64.tar.gz` (glibc — matches our Debian guest).
+        // The `-musl` variant is for Alpine/static libc, NOT Debian. A legacy
+        // `.zip` name is kept as fallback so older cached assets still install.
+        // Tolerant order: exact glibc tarball first, then any linux-arm64
+        // tarball (e.g. musl if upstream renames), then legacy zip — so a
+        // future asset rename surfaces as a working install, not a dead error.
         val match = release.assets.firstOrNull { asset ->
+            asset.name == "opencode-linux-arm64.tar.gz" && asset.url.isNotBlank()
+        } ?: release.assets.firstOrNull { asset ->
+            asset.name.contains("linux-arm64", ignoreCase = true) &&
+                asset.name.endsWith(".tar.gz", ignoreCase = true) &&
+                asset.url.isNotBlank()
+        } ?: release.assets.firstOrNull { asset ->
             asset.name == "opencode-linux-arm64.zip" && asset.url.isNotBlank()
         }
         if (match == null) {
-            val names = release.assets.map { it.name }.take(10)
+            val names = release.assets.map { it.name }.take(8)
             LocalBackend.appendLog("resolve: opencode assets: ${names.joinToString(", ")}")
-            error("Pinned opencode $PINNED_TAG has no linux-arm64 build listed.")
+            error(
+                "Pinned opencode $PINNED_TAG has no linux-arm64 build listed " +
+                    "(found: ${names.joinToString(", ").ifBlank { "none" }})."
+            )
         }
         OpencodeAsset(
             version = release.tag.trim().removePrefix("v").ifBlank { "unknown" },

@@ -62,14 +62,4 @@ object AtMentions {
             score to AtFile(path, path.substringAfterLast('/'))
         }.sortedByDescending { it.first }.take(8).map { it.second }
     }
-
-    /** Strip markdown/code for TTS readout (kai9000 speakable-text idea). */
-    fun speakable(text: String): String = text
-        .replace(Regex("```[\\s\\S]*?```"), " code block ")
-        .replace(Regex("`([^`]*)`"), "$1")
-        .replace(Regex("^#{1,6}\\s+", RegexOption.MULTILINE), "")
-        .replace(Regex("[*_~>|#]"), "")
-        .replace(Regex("\\[([^\\]]*)\\]\\([^\\)]*\\)"), "$1")
-        .replace(Regex("\\s+"), " ")
-        .trim()
 }

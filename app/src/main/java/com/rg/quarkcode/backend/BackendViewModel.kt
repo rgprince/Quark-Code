@@ -196,13 +196,17 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
                 // Update checks bypass the cached asset so they see upstream.
                 if (checkUpdate) withContext(Dispatchers.IO) { store.clearOpencodeAsset() }
                 // Migration: cached 0.0.x assets point at the archived
-                // opencode-ai repo (no server mode). Drop them so retry
-                // actually fetches the pinned sst build instead of
+                // opencode-ai repo (no server mode), sst/opencode is archived,
+                // and the .zip era never existed upstream (real asset is the
+                // glibc `opencode-linux-arm64.tar.gz`). Drop them so retry
+                // actually fetches the pinned anomalyco build instead of
                 // re-installing the same dead binary.
                 withContext(Dispatchers.IO) {
                     val stale = store.cachedOpencodeAsset()
                     if (stale != null &&
                         (stale.url.contains("opencode-ai/opencode") ||
+                            stale.url.contains("sst/opencode") ||
+                            stale.fileName.endsWith(".zip", ignoreCase = true) ||
                             stale.version.startsWith("0.0"))
                     ) {
                         store.clearOpencodeAsset()
@@ -233,12 +237,25 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
                     opencodeStages = emptyList()
                 } else {
                     val failed = opencodeStages.firstOrNull { it.state == StageState.ACTIVE }?.id
+                    // Resolve failures are fully described by the banner above
+                    // (vm.error) — keep the stage row short so the same text
+                    // isn't shown twice.
+                    val detail = if (failed == GuestOpencode.STAGE_RESOLVE) {
+                        "retry with the button below"
+                    } else {
+                        e.message?.take(160) ?: "failed"
+                    }
+                    // A failed resolve must never poison the cache: the next
+                    // tap re-resolves live instead of reusing a stale asset.
+                    if (failed == GuestOpencode.STAGE_RESOLVE) {
+                        withContext(Dispatchers.IO) { store.clearOpencodeAsset() }
+                    }
                     opencodeStages = if (failed != null) {
-                        setStage(opencodeStages, failed, StageState.ERROR, detail = e.message?.take(160) ?: "failed")
+                        setStage(opencodeStages, failed, StageState.ERROR, detail = detail)
                     } else {
                         opencodeStages
                     }
-                    error = e.message?.take(200) ?: "opencode install failed"
+                    error = e.message?.take(320) ?: "opencode install failed"
                 }
             }
         }

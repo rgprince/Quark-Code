@@ -71,7 +71,6 @@ fun ChatScreen(
     onSlashSelect: (SlashSuggestion) -> Unit,
     onAtSelect: (AtFile) -> Unit,
     onVoiceResult: (String) -> Unit,
-    onSpeak: (String, String) -> Unit,
     onDismissTodos: () -> Unit,
     onOpenSettings: () -> Unit,
     onMenu: () -> Unit
@@ -96,15 +95,6 @@ fun ChatScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) launchRecognizer()
-    }
-    // Auto-readout: speak the newest assistant text once the turn completes.
-    val lastAssistantText = remember(state.messages) {
-        state.messages.lastOrNull { !it.isUser }?.text.orEmpty()
-    }
-    LaunchedEffect(lastAssistantText, state.autoSpeak, state.sending) {
-        if (state.autoSpeak && !state.sending && lastAssistantText.isNotBlank()) {
-            onSpeak("auto", lastAssistantText)
-        }
     }
     // Busy = sending flags OR live work the flags can lag behind (streaming
     // deltas, running tools) OR a sent prompt with no reply content yet. The
@@ -199,7 +189,6 @@ fun ChatScreen(
                     comfortable = state.comfortable,
                     showTimestamps = state.showTimestamps,
                     thinkingSecs = thinkingSecs,
-                    speakingId = state.speakingId,
                     thoughtMs = lastThoughtMs,
                     thoughtText = lastThoughtText,
                     thoughtExpanded = thoughtExpanded,
@@ -214,8 +203,7 @@ fun ChatScreen(
                     onDeny = onDeny,
                     onRememberChange = onRememberChange,
                     onRetry = onRetry,
-                    onAnswer = onAnswer,
-                    onSpeak = onSpeak
+                    onAnswer = onAnswer
                 )
             }
             OrbitComposer(

@@ -154,7 +154,7 @@ fun DeviceBackendPanel(
                 )
             } else {
                 Text(
-                    text = "The official agent binary, installed straight from sst/opencode releases (~170 MB).",
+                    text = "The official agent binary, installed straight from anomalyco/opencode releases (~60 MB).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -284,7 +284,7 @@ fun DeviceBackendPanel(
         Text(
             text = "Server: official opencode (MIT) in Debian (proot, GPL-2.0). " +
                 "Agent workspace lives in app-private storage. Tap Copy above to paste the log for debugging. Sources: " +
-                "github.com/sst/opencode · termux/proot-distro",
+                "github.com/anomalyco/opencode · termux/proot-distro",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

@@ -124,8 +124,6 @@ data class ChatUiState(
     val queuedCount: Int = 0,
     val hiddenModels: List<CatalogModel> = emptyList(),
     val atSuggestions: List<AtFile> = emptyList(),
-    val autoSpeak: Boolean = false,
-    val speakingId: String? = null,
     val catalog: List<CatalogModel> = listOf(CatalogModel("auto", "Auto (server default)")),
     val modelRecents: List<String> = emptyList(),
     val catalogLoading: Boolean = false,
