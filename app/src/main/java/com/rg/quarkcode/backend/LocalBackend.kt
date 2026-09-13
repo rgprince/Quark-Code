@@ -58,6 +58,10 @@ object LocalBackend {
         _logs.value = (_logs.value + clean).takeLast(200)
     }
 
+    fun clearLogs() {
+        _logs.value = emptyList()
+    }
+
     private fun guestBase(context: Context, suite: ProotSuite.Paths): ArrayList<String> {
         val guest = RuntimeFiles.guest(context)
         return arrayListOf(
@@ -124,13 +128,20 @@ object LocalBackend {
             RuntimeFiles.ensureDirs(context)
             val store = RuntimeStore(context.applicationContext)
             val password = store.password()
+            // Same-backend rule: if something already answers on 4096
+            // (stale process, manual start, previous run we lost track of),
+            // adopt it instead of grabbing the port and dying with EADDRINUSE.
+            if (checkHealth(password)) {
+                val version = runCatching { store.prefs.first().opencodeVersion }.getOrNull()
+                _state.value = State.Running(version ?: "official")
+                appendLog("✓ already answering on 127.0.0.1:$PORT — adopted")
+                return@withContext true
+            }
             val cmd = guestBase(context, suite)
-            // v0.0.55 (opencode-ai, Go) has `serve` but NO --port/--hostname
-            // flags — and its defaults are already 4096 + 127.0.0.1. Newer
-            // sst/opencode accepts the flags but doesn't need them either,
-            // so run bare `serve` for compat with what you already
-            // downloaded (no re-download on limited internet).
-            cmd.addAll(listOf(GuestOpencode.GUEST_BIN, "serve"))
+            // sst/opencode (v1.x) supports these; the archived Go binary
+            // (v0.0.55) does not — but that binary has no server mode at
+            // all, so it can never be the backend (see GuestOpencode).
+            cmd.addAll(listOf(GuestOpencode.GUEST_BIN, "serve", "--port", PORT.toString(), "--hostname", "127.0.0.1"))
             val pb = ProcessBuilder(cmd)
             pb.directory(RuntimeFiles.workspace(context))
             pb.redirectErrorStream(true)
@@ -138,7 +149,7 @@ object LocalBackend {
             env.clear()
             env.putAll(guestEnv(context, suite, password))
             _state.value = State.Starting
-            appendLog("$ opencode serve (official, Debian guest)")
+            appendLog("$ opencode serve --port $PORT (official, Debian guest)")
             val proc = pb.start()
             process = proc
             thread(isDaemon = true, name = "opencode-log") {

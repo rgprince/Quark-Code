@@ -35,6 +35,47 @@ object GuestArchive {
         }
     }
 
+    /** sst/opencode ships `opencode-linux-arm64.zip` (single binary). */
+    suspend fun extractZip(
+        input: InputStream,
+        dest: File,
+        onProgress: suspend (files: Long, bytes: Long) -> Unit = { _, _ -> }
+    ) {
+        dest.mkdirs()
+        val root = dest.canonicalFile
+        var files = 0L
+        var bytes = 0L
+        java.util.zip.ZipInputStream(BufferedInputStream(input)).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                coroutineContext.ensureActive()
+                val target = File(dest, entry.name).canonicalFile
+                require(target == root || target.path.startsWith(root.path + File.separator)) {
+                    "Archive escapes destination: ${entry.name}"
+                }
+                if (entry.isDirectory) {
+                    target.mkdirs()
+                } else {
+                    target.parentFile?.mkdirs()
+                    if (target.exists()) target.delete()
+                    target.outputStream().buffered().use { out -> zip.copyTo(out) }
+                    target.setReadable(true, false)
+                    target.setWritable(true, true)
+                    // The opencode binary must stay exec-able after extract.
+                    if (target.name == "opencode" || !entry.name.contains('.')) {
+                        target.setExecutable(true, false)
+                    }
+                    files++
+                    bytes += entry.compressedSize.coerceAtLeast(0L)
+                    if (files % 50L == 0L) onProgress(files, bytes)
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        onProgress(files, bytes)
+    }
+
     private suspend fun extractTar(
         input: InputStream,
         dest: File,

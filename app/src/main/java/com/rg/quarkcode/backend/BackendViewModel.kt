@@ -350,6 +350,9 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         fun deleteTmp(app: android.content.Context) {
             val tmp = java.io.File(RuntimeFiles.root(app), "debian.tmp")
             if (tmp.exists()) tmp.delete()
+            val pkg = java.io.File(RuntimeFiles.root(app), "opencode.pkg")
+            if (pkg.exists()) pkg.delete()
+            // Legacy name from the tar.gz era — clean once, then forget.
             val tgz = java.io.File(RuntimeFiles.root(app), "opencode.tgz")
             if (tgz.exists()) tgz.delete()
         }

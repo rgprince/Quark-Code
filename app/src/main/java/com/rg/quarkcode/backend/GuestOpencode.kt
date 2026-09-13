@@ -36,9 +36,14 @@ data class OpencodeAsset(
 
 /**
  * Official opencode installer — untouched upstream bits
- * (opencode-ai/opencode releases, `opencode-linux-arm64.tar.gz`), extracted
+ * (sst/opencode releases, `opencode-linux-arm64.zip`), extracted
  * on the HOST straight into the guest tree. No guest network needed for
  * this step and no middleman builds, so updates track upstream day-zero.
+ *
+ * NOTE: opencode-ai/opencode (v0.0.55, Go, archived Sep 2025) has NO
+ * `serve`/`web` subcommand — bare `serve` fails with
+ * "agent coder not found". Only sst/opencode (v1.x, Bun/TS) can be the
+ * backend, so old installs MUST update (one ~150 MB re-download).
  */
 object GuestOpencode {
 
@@ -50,7 +55,7 @@ object GuestOpencode {
     const val GUEST_BIN = "/root/.opencode/bin/opencode"
 
     private const val LATEST_URL =
-        "https://api.github.com/repos/opencode-ai/opencode/releases/latest"
+        "https://api.github.com/repos/sst/opencode/releases/latest"
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -89,9 +94,9 @@ object GuestOpencode {
         }
         val release = runCatching { json.decodeFromString<OcRelease>(text) }.getOrNull()
             ?: error("opencode release list was unreadable.")
-        // Official install script uses opencode-linux-<arch>.tar.gz.
+        // sst/opencode ships per-arch zips: opencode-linux-arm64.zip.
         val match = release.assets.firstOrNull { asset ->
-            asset.name == "opencode-linux-arm64.tar.gz" && asset.url.isNotBlank()
+            asset.name == "opencode-linux-arm64.zip" && asset.url.isNotBlank()
         }
         if (match == null) {
             val names = release.assets.map { it.name }.take(10)
@@ -112,7 +117,7 @@ object GuestOpencode {
         report: suspend (stage: String, fraction: Float, detail: String) -> Unit
     ) {
         report(STAGE_RESOLVE, 1f, asset.fileName)
-        val tmp = File(RuntimeFiles.root(context), "opencode.tgz")
+        val tmp = File(RuntimeFiles.root(context), "opencode.pkg")
         withContext(Dispatchers.IO) {
             HttpDownload.get(this, asset.url, tmp, asset.size) { done, total ->
                 val fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else -1f
@@ -124,9 +129,18 @@ object GuestOpencode {
         withContext(Dispatchers.IO) {
             val binDir = guestBinary(context).parentFile!!
             binDir.mkdirs()
+            // Wipe the old Go binary first so a stale v0.0.55 can never
+            // shadow the new server-capable one at the same path.
+            guestBinary(context).takeIf { it.isFile }?.delete()
             tmp.inputStream().buffered().use { input ->
-                GuestArchive.extractTarGz(input, binDir) { files, _ ->
-                    report(STAGE_EXTRACT, -1f, "$files files…")
+                if (asset.fileName.endsWith(".zip", ignoreCase = true)) {
+                    GuestArchive.extractZip(input, binDir) { files, _ ->
+                        report(STAGE_EXTRACT, -1f, "$files files…")
+                    }
+                } else {
+                    GuestArchive.extractTarGz(input, binDir) { files, _ ->
+                        report(STAGE_EXTRACT, -1f, "$files files…")
+                    }
                 }
             }
             tmp.delete()

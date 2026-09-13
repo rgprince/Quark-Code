@@ -196,6 +196,22 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8.4 scope — real server binary + copyable logs + port adoption
+- [x] New error decoded from screenshots: `Error: agent coder not found`
+  with only `-c/-p/-f/-q/-v` flags = v0.0.55 (opencode-ai Go, archived)
+  has NO `serve`/`web` mode at all — the old 42 MB binary can never be
+  the backend, one ~150 MB re-download to sst/opencode (v1.x,
+  `opencode-linux-arm64.zip`) is unavoidable
+- [x] `GuestOpencode` now resolves `sst/opencode/releases/latest`,
+  new `GuestArchive.extractZip` (traversal-guarded, exec bit kept),
+  old Go binary wiped before extract so it can't shadow the new one
+- [x] `serve --port 4096 --hostname 127.0.0.1` restored (v1.x supports
+  it); pre-start health check adopts whatever already answers on 4096
+  instead of dying with EADDRINUSE (same-backend rule)
+- [x] Server log got Copy + Clear buttons (clipboard, zero new deps);
+  full in-app terminal skipped (needs pty/xterm — heavy, later)
+- [x] v0.13.0 (code 14), same dummy key — `adb install -r` updates
+
 ## V8.3 scope — proot libtalloc link fix (screenshot bug)
 - [x] Root cause: AGP only packages `*.so` from jniLibs, so the SONAME-exact
   `libtalloc.so.2` never reached nativeLibraryDir — linker died with

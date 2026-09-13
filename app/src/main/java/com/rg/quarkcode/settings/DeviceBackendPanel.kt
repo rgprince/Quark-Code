@@ -30,8 +30,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -152,7 +154,7 @@ fun DeviceBackendPanel(
                 )
             } else {
                 Text(
-                    text = "The official agent binary, installed straight from opencode-ai releases (~170 MB).",
+                    text = "The official agent binary, installed straight from sst/opencode releases (~170 MB).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -239,11 +241,27 @@ fun DeviceBackendPanel(
         }
 
         if (logs.isNotEmpty()) {
-            Text(
-                text = "Server log",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            val clipboard = LocalClipboardManager.current
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Server log",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedButton(onClick = {
+                    clipboard.setText(AnnotatedString(logs.joinToString("\n")))
+                }) {
+                    Text("Copy")
+                }
+                OutlinedButton(onClick = { LocalBackend.clearLogs() }) {
+                    Text("Clear")
+                }
+            }
             Card(
                 shape = RoundedCornerShape(10.dp),
                 colors = CardDefaults.cardColors(
@@ -265,8 +283,8 @@ fun DeviceBackendPanel(
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "Server: official opencode (MIT) in Debian (proot, GPL-2.0). " +
-                "Agent workspace lives in app-private storage. Sources: " +
-                "github.com/opencode-ai/opencode · termux/proot-distro",
+                "Agent workspace lives in app-private storage. Tap Copy above to paste the log for debugging. Sources: " +
+                "github.com/sst/opencode · termux/proot-distro",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
