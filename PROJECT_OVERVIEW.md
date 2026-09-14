@@ -367,6 +367,17 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
   scroll traps (Review/ServerInfo), capped chat images, keyed drawer rows,
    progress semantics, 48dp sheet buttons, memoized schedule subtitles
 
+## V8.9 scope — settings connection truth + composer declutter (user bug batch)
+- [x] Settings no longer goes stale: saved remote tried first, on-device
+-   loopback (127.0.0.1:4096 + RuntimeStore password, the same backend chat
+-   auto-attaches) tried second for providers, provider/auth, key save/remove,
+-   and all MCP calls (load/add/toggle). Empty-list-with-401 root cause fixed;
+-   errors now carry server text + "Start the backend or Test & save" hint
+- [x] `loadAll()` also loads providers so the Device-tab summary is live
+- [x] Composer declutter: "auto" thinking VariantPill removed (effort stays in
+-   the model sheet), `used/limit · %` text removed from the action row
+-   (top-right ring remains the single % readout); thin MeterBar kept
+
 ## V9 scope — workspace file manager + sandbox + F-Droid (v0.14.0, code 16)
 - [x] Files (`files/` package, zero new deps): Workspace read/write +
   System read-only browser, Workspace/System segmented roots, breadcrumbs,

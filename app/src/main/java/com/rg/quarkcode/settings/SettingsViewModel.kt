@@ -11,6 +11,7 @@ import com.rg.quarkcode.backend.ConnectionStore
 import com.rg.quarkcode.backend.Health
 import com.rg.quarkcode.backend.McpStatus
 import com.rg.quarkcode.backend.OpenCodeUrl
+import com.rg.quarkcode.backend.RuntimeStore
 import com.rg.quarkcode.backend.ServeApi
 import com.rg.quarkcode.backend.ThemeMode
 import com.rg.quarkcode.backend.ThemeStore
@@ -60,6 +61,7 @@ data class SettingsUiState(
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val connectionStore = ConnectionStore(application)
+    private val runtimeStore = RuntimeStore(application)
     private val themeStore = ThemeStore(application)
     private val modelStore = com.rg.quarkcode.backend.ModelStore(application)
     private val chatPrefs = com.rg.quarkcode.chat.ChatPrefs(application)
@@ -132,6 +134,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun loadAll() {
         loadMcp()
+        loadProviders()
         loadChatPrefs()
     }
 
@@ -158,51 +161,93 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { chatPrefs.setDetailed(value) }
     }
 
-    // ---- Provider catalog (Settings has its own VM) ----
+    // ---- Connection resolution + provider catalog (Settings has its own VM) ----
+    // Chat auto-attaches the on-device backend (127.0.0.1:4096 + RuntimeStore
+    // password) without ever pressing Test & save, so ConnectionStore alone
+    // goes stale (empty password → 401 → empty provider/MCP lists). Try the
+    // saved remote first, then the on-device loopback, and use whichever
+    // answers /global/health.
+    private suspend fun candidates(): List<ServeApi> {
+        val saved = runCatching {
+            withContext(Dispatchers.IO) { connectionStore.connection.first() }
+        }.getOrNull()
+        val list = mutableListOf<ServeApi>()
+        if (saved != null && saved.host.isNotBlank()) {
+            list += ServeApi(saved.host, saved.username, saved.password)
+        }
+        val localPw = runCatching {
+            withContext(Dispatchers.IO) { runtimeStore.password() }
+        }.getOrNull().orEmpty()
+        list += ServeApi("http://127.0.0.1:4096", "opencode", localPw)
+        return list
+    }
+
+    private suspend fun firstWorkingApi(): ServeApi? {
+        val all = candidates()
+        for (api in all) {
+            val ok = runCatching { api.get<Health>("global/health") }.isSuccess
+            if (ok) return api
+        }
+        return all.firstOrNull()
+    }
+
+    private suspend fun loadCatalogFrom(api: ServeApi): com.rg.quarkcode.backend.ProviderCatalog? {
+        return runCatching { api.get<com.rg.quarkcode.backend.ProviderCatalog>("provider") }
+            .getOrNull()
+            ?.takeIf { it.all.isNotEmpty() }
+            ?: runCatching { api.get<com.rg.quarkcode.backend.ProvidersResponse>("config/providers") }
+                .getOrNull()
+                ?.let { fallback ->
+                    com.rg.quarkcode.backend.ProviderCatalog(
+                        all = fallback.providers.map { entry ->
+                            com.rg.quarkcode.backend.OpenCodeProvider(
+                                id = entry.id,
+                                name = entry.name,
+                                models = entry.models.associate { model ->
+                                    model.id to com.rg.quarkcode.backend.OpenCodeModel(id = model.id, name = model.name)
+                                }
+                            )
+                        },
+                        default = fallback.default,
+                        connected = fallback.providers.map { it.id }
+                    )
+                }
+                ?.takeIf { it.all.isNotEmpty() }
+    }
 
     fun loadProviders() {
         viewModelScope.launch {
-            // Read the SAVED connection (uiState may still hold unsaved edits or defaults
-            // while init is loading — that race made the provider list silently empty).
-            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
-            val host = saved.host.ifBlank { uiState.host }
-            if (host.isBlank()) {
-                uiState = uiState.copy(providersLoading = false, providersError = "Set the server URL first, then Test & save.")
-                return@launch
-            }
-            val api = ServeApi(host, saved.username, saved.password)
             uiState = uiState.copy(providersLoading = true, providersError = null)
-            val catalog = runCatching { api.get<com.rg.quarkcode.backend.ProviderCatalog>("provider") }
-                .getOrNull()
-                ?.takeIf { it.all.isNotEmpty() }
-                ?: runCatching { api.get<com.rg.quarkcode.backend.ProvidersResponse>("config/providers") }
-                    .getOrNull()
-                    ?.let { fallback ->
-                        com.rg.quarkcode.backend.ProviderCatalog(
-                            all = fallback.providers.map { entry ->
-                                com.rg.quarkcode.backend.OpenCodeProvider(
-                                    id = entry.id,
-                                    name = entry.name,
-                                    models = entry.models.associate { model ->
-                                        model.id to com.rg.quarkcode.backend.OpenCodeModel(id = model.id, name = model.name)
-                                    }
-                                )
-                            },
-                            default = fallback.default,
-                            connected = fallback.providers.map { it.id }
-                        )
-                    }
-                    ?.takeIf { it.all.isNotEmpty() }
+            var catalog: com.rg.quarkcode.backend.ProviderCatalog? = null
+            var workingApi: ServeApi? = null
+            var lastError: String? = null
+            for (api in candidates()) {
+                val got = loadCatalogFrom(api)
+                if (got != null) {
+                    catalog = got
+                    workingApi = api
+                    break
+                } else {
+                    lastError = runCatching { api.get<Health>("global/health") }
+                        .exceptionOrNull()?.message
+                }
+            }
             if (catalog == null) {
-                uiState = uiState.copy(providersLoading = false, providersError = "No providers reachable. Test connection first.")
+                uiState = uiState.copy(
+                    providersLoading = false,
+                    providersError = lastError?.let { "No providers reachable ($it). Start the backend or Test & save." }
+                        ?: "No providers reachable. Start the backend or Test & save."
+                )
                 return@launch
             }
             providerModels = catalog.all.associate { p -> p.id to p.models.keys.toList() }
             val connected = catalog.connected.toSet()
             val sel = runCatching { withContext(Dispatchers.IO) { modelStore.selection.first() } }.getOrNull()
-            val methods = runCatching {
-                api.get<Map<String, List<com.rg.quarkcode.backend.ProviderAuthMethod>>>("provider/auth")
-            }.getOrNull() ?: emptyMap()
+            val methods = workingApi?.let { api ->
+                runCatching {
+                    api.get<Map<String, List<com.rg.quarkcode.backend.ProviderAuthMethod>>>("provider/auth")
+                }.getOrNull()
+            } ?: emptyMap()
             authMethods = methods
             uiState = uiState.copy(
                 providersLoading = false,
@@ -255,9 +300,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
         viewModelScope.launch {
             uiState = uiState.copy(authDialog = dialog.copy(saving = true, error = null))
-            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
+            val api = firstWorkingApi()
+            if (api == null) {
+                uiState = uiState.copy(
+                    authDialog = dialog.copy(saving = false, error = "No server reachable. Start the backend or Test & save.")
+                )
+                return@launch
+            }
             val result = runCatching {
-                ServeApi(saved.host, saved.username, saved.password).putUnit(
+                api.putUnit(
                     "auth/${dialog.providerId}",
                     buildJsonObject {
                         put("type", "api")
@@ -280,10 +331,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val dialog = uiState.authDialog ?: return
         viewModelScope.launch {
             uiState = uiState.copy(authDialog = dialog.copy(saving = true, error = null))
-            val saved = withContext(Dispatchers.IO) { connectionStore.connection.first() }
+            val api = firstWorkingApi()
+            if (api == null) {
+                uiState = uiState.copy(
+                    authDialog = dialog.copy(saving = false, error = "No server reachable. Start the backend or Test & save.")
+                )
+                return@launch
+            }
             val result = runCatching {
-                ServeApi(saved.host, saved.username, saved.password)
-                    .deleteUnit("auth/${dialog.providerId}")
+                api.deleteUnit("auth/${dialog.providerId}")
             }
             result.onSuccess {
                 uiState = uiState.copy(authDialog = null)
@@ -296,16 +352,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun client(): ServeApi? {
-        val state = uiState
-        if (state.host.isBlank()) return null
-        return ServeApi(state.host, state.username, state.password)
-    }
-
     fun loadMcp() {
         viewModelScope.launch {
-            val api = client() ?: return@launch
             uiState = uiState.copy(mcpLoading = true, mcpError = null)
+            // Same stale-connection trap as providers: prefer the saved
+            // remote, fall back to the on-device loopback the chat uses.
+            val api = firstWorkingApi()
+            if (api == null) {
+                uiState = uiState.copy(
+                    mcpLoading = false,
+                    mcpError = "No server reachable. Start the backend or Test & save."
+                )
+                return@launch
+            }
             runCatching { api.get<Map<String, McpStatus>>("mcp") }
                 .onSuccess { servers ->
                     uiState = uiState.copy(mcpLoading = false, mcpServers = servers)
@@ -335,7 +394,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             return
         }
         viewModelScope.launch {
-            val api = client() ?: return@launch
+            val api = firstWorkingApi()
+            if (api == null) {
+                uiState = uiState.copy(
+                    mcpLoading = false,
+                    mcpError = "No server reachable. Start the backend or Test & save."
+                )
+                return@launch
+            }
             uiState = uiState.copy(mcpLoading = true, mcpError = null)
             runCatching {
                 api.post<McpStatus>(
@@ -365,7 +431,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun toggleMcp(name: String, enable: Boolean) {
         viewModelScope.launch {
-            val api = client() ?: return@launch
+            val api = firstWorkingApi() ?: return@launch
             runCatching {
                 api.postUnit(
                     "mcp/${api.encodePath(name)}/${if (enable) "connect" else "disconnect"}",
