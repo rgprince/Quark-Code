@@ -349,7 +349,6 @@ fun SettingsScreen(
                             )
                         }
                     }
-                }
                     item(key = "chat") {
                         SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
                             ChatToggle(
