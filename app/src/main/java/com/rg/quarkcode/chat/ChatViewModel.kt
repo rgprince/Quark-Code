@@ -52,8 +52,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var eventJob: Job? = null
     // Stale idle events from a previous turn can land just after a new
     // startRun and wrongly clear its busy flags (send button flips back to
-    // send-arrow mid-reply, transcript looks dead). Ignore idle until this.
+    // send-arrow mid-reply, transcript looks dead). Idle inside this window
+    // is deferred past it instead of dropped, so fast turns (<4s) still
+    // settle instead of polling to the 120s timeout with stop stuck on.
+    // runGen tags each run: deferred idles from a superseded run are dropped.
     private var ignoreIdleUntil = 0L
+    private var runGen = 0
     private var streamHost = ""
     private var streamUser = ""
     private var streamPass = ""
@@ -512,6 +516,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun sendSlashCommand(command: String, arguments: String) {
         pollJob?.cancel()
+        runGen++
         ignoreIdleUntil = System.currentTimeMillis() + 4000L
         val displayText = "/$command${arguments.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()}"
         val userMessage = ChatMessage(
@@ -722,6 +727,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startRun(text: String) {
         pollJob?.cancel()
+        runGen++
         ignoreIdleUntil = System.currentTimeMillis() + 4000L
         val userMessage = ChatMessage(
             id = UUID.randomUUID().toString(),
@@ -838,8 +844,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         uiState = uiState.copy(messages = merged)
                     }
                     mapped.forEach { lastSeenIds.add(it.id) }
-                    if (turnFinished(serverMessages, idsBeforeSend)) {
-                        uiState = uiState.copy(sending = false, thinking = false, awaitingReply = false)
+                    if (turnFinished(serverMessages, idsBeforeSend, merged)) {
+                        // First reply landed: the "waiting" UI can stand down,
+                        // but sending stays LATCHED — only session idle, abort
+                        // or error ends the turn. Clearing here parked the
+                        // composer on send through every inter-tool gap,
+                        // faking a finished model mid-turn.
+                        uiState = uiState.copy(thinking = false, awaitingReply = false)
                     }
                 }
             }
@@ -871,6 +882,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun abort() {
         val id = sessionId ?: return
         pollJob?.cancel()
+        // The abort's own idle/error belongs to the dead run: generation-bump
+        // so deferred idles can never leak into the next turn.
+        runGen++
         viewModelScope.launch {
             runCatching {
                 api?.postUnit(
@@ -1013,6 +1027,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Idle that lands inside the fresh-run window is deferred past it instead
+    // of dropped (fast turns still settle), and dropped if a newer run has
+    // since started (a stale idle must never end the replacement turn).
+    private fun deferIdle(event: ServerEvent, gen: Int) {
+        val wait = ignoreIdleUntil - System.currentTimeMillis() + 200L
+        viewModelScope.launch {
+            if (wait > 0) kotlinx.coroutines.delay(wait)
+            if (gen == runGen) handleEvent(event)
+        }
+    }
+
     private fun handleEvent(event: ServerEvent) {
         val id = sessionId
         when (event) {
@@ -1113,7 +1138,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     else -> null
                 }
                 if (errorSession != id) return
-                if (System.currentTimeMillis() < ignoreIdleUntil && error == null) return
+                if (error == null && System.currentTimeMillis() < ignoreIdleUntil) {
+                    deferIdle(event, runGen)
+                    return
+                }
                 // Stale idle from an earlier turn must not end the new one:
                 // while we still await the first reply content, idle only
                 // means "nothing yet", not "finished".
@@ -1140,7 +1168,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             is ServerEvent.StatusChanged -> {
                 if (event.sessionId != id) return
                 if (event.status == "idle") {
-                    if (System.currentTimeMillis() < ignoreIdleUntil) return
+                    if (System.currentTimeMillis() < ignoreIdleUntil) {
+                        deferIdle(event, runGen)
+                        return
+                    }
                     if (uiState.awaitingReply &&
                         uiState.messages.lastOrNull()?.isUser == true
                     ) return
@@ -1148,6 +1179,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     refreshMessages()
                     refreshTodos()
                     drainQueue()
+                } else {
+                    // Busy/retry latches the turn: a run that kept going (or
+                    // started from another client) re-arms stop so mid-turn
+                    // gaps never fake a finished model.
+                    if (!uiState.sending) uiState = uiState.copy(sending = true)
                 }
             }
             is ServerEvent.SessionCreated -> loadRecents()
@@ -1358,7 +1394,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         message
                     }
-                }
+                },
+                // The turn continues after the user answers: re-latch so the
+                // post-allow gap doesn't fake a finished model.
+                sending = true,
+                awaitingReply = true
             )
         }
     }
@@ -1389,7 +1429,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             part is ChatPart.QuestionOption && part.requestId == requestId
                         }
                     )
-                }
+                },
+                // The turn continues after the answer: keep waiting UI armed.
+                sending = true,
+                awaitingReply = true
             )
         }
     }

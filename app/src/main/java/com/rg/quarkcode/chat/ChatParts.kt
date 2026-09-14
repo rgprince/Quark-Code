@@ -215,9 +215,24 @@ fun MessageWithParts.toUiMessage(): ChatMessage? {
     )
 }
 
-// Completion is read off the transcript: a fresh assistant message means done.
-fun turnFinished(serverMessages: List<MessageWithParts>, idsBeforeSend: Set<String>): Boolean =
-    serverMessages.any { it.info.role == "assistant" && it.info.id !in idsBeforeSend }
+// Completion is read off the transcript: a fresh assistant message with no
+// tools still RUNNING/PENDING means done. A fresh message alone is NOT
+// enough — the first text chunk commits mid-turn while tools still run, and
+// ending there parked the composer on send for the rest of the turn.
+fun turnFinished(
+    serverMessages: List<MessageWithParts>,
+    idsBeforeSend: Set<String>,
+    mapped: List<ChatMessage>
+): Boolean {
+    val fresh = serverMessages.filter { it.info.role == "assistant" && it.info.id !in idsBeforeSend }
+    if (fresh.isEmpty()) return false
+    val byId = mapped.associateBy { it.id }
+    return fresh.none { msg ->
+        byId[msg.info.id]?.parts?.filterIsInstance<ChatPart.Tool>()?.any {
+            it.status == ToolStatus.RUNNING || it.status == ToolStatus.PENDING
+        } == true
+    }
+}
 
 // Reload merge that keeps streamed-only messages until the transcript
 // produces its own copy under the same id.

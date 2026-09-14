@@ -113,6 +113,11 @@ fun ChatScreen(
     var lastThoughtMs by remember { mutableStateOf<Long?>(null) }
     var thoughtExpanded by remember { mutableStateOf(false) }
     var thinkingSecs by remember { mutableStateOf(0) }
+    // Which prompt the recorded thought belongs to (user-bubble count when
+    // the phase completed, null until the first timed phase). A new prompt
+    // bumps the count, hiding the stale line so it never renders as a dummy
+    // "Thought" under the new bubble next to the live "thinking…" tail.
+    var thoughtUserCount by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(state.thinking) {
         if (state.thinking) {
             // New think phase: time it, but keep the previous thought line
@@ -131,6 +136,7 @@ fun ChatScreen(
                 lastThoughtMs = (System.currentTimeMillis() - started).coerceAtLeast(0L)
                 thoughtExpanded = false
                 thinkStart = null
+                thoughtUserCount = state.messages.count { it.isUser }
             }
             thinkingSecs = 0
         }
@@ -142,6 +148,11 @@ fun ChatScreen(
     val streamingIds = remember(state.messages) {
         state.messages.filter { it.isStreaming }.map { it.id }.toSet()
     }
+    // Stale-thought gate: null (no timed phase yet, e.g. old chats) counts
+    // as ready so the transcript fallback still shows; otherwise the thought
+    // only shows under the prompt it answered.
+    val userCount = state.messages.count { it.isUser }
+    val thoughtReady = thoughtUserCount == null || thoughtUserCount == userCount
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -191,6 +202,7 @@ fun ChatScreen(
                     thinkingSecs = thinkingSecs,
                     thoughtMs = lastThoughtMs,
                     thoughtText = lastThoughtText,
+                    thoughtReady = thoughtReady,
                     thoughtExpanded = thoughtExpanded,
                     onToggleThought = { thoughtExpanded = !thoughtExpanded },
                     textScale = state.textScale,

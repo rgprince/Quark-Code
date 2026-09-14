@@ -396,3 +396,17 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] F-Droid: `dist` flavors (`gplay`/`fdroid`, same ID/code, zero
   proprietary deps in either) + `fastlane/metadata/android/en-US/`
   (title/short/full/changelog); CI uploads per-flavor APKs
+
+## V8.10 scope — single thinking slot + latched busy (screenshot bugs)
+- [x] Double thinking fixed: the completed "Thought · Xms" line is now gated
+-   to the prompt it answered (user-count gate, null = old-chat fallback
+-   still shows), so a stale dummy never stacks above the live "thinking…"
+-   tail under a new prompt (`ChatScreen.thoughtReady` → `MessageList`)
+- [x] Busy latched for the whole turn (AndCode-studied, own code): `sending`
+-   clears only on session idle / abort / error / timeout — transcript
+-   `turnFinished` now also requires no RUNNING/PENDING tools and only
+-   stands down waiting UI, and fresh-run-window idles are deferred past the
+-   window (gen-tagged, superseded runs dropped) instead of dropped, so fast
+-   turns still settle. `busy`/`retry` status re-latches, allow/deny/answer
+-   re-arm the continued turn. Inter-tool gaps no longer fake a finished
+-   model (stop stays, tail shows instead of a dead send button)

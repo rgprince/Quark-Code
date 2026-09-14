@@ -77,6 +77,7 @@ fun MessageList(
     thinkingSecs: Int = 0,
     thoughtMs: Long? = null,
     thoughtText: String = "",
+    thoughtReady: Boolean = true,
     thoughtExpanded: Boolean = false,
     onToggleThought: () -> Unit = {},
     textScale: Float = 1f,
@@ -142,7 +143,10 @@ fun MessageList(
                     // recorded a phase OR when the transcript itself holds
                     // reasoning — old chats never run the timer, so without
                     // this fallback the line never appears for them.
-                    if (index == lastUserIndex && showThoughts &&
+                    // thoughtReady hides the stale line once a newer prompt
+                    // exists, so a dummy "Thought" never stacks above the
+                    // live "thinking…" tail.
+                    if (index == lastUserIndex && showThoughts && thoughtReady &&
                         (thoughtMs != null || thoughtText.isNotBlank())
                     ) {
                         ThoughtDoneRow(
