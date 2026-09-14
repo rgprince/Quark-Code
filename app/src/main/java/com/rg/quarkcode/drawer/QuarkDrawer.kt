@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Difference
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -45,6 +46,7 @@ fun QuarkDrawer(
     onNewChat: () -> Unit,
     onOpenSession: (String) -> Unit,
     onOpenReview: () -> Unit,
+    onOpenFiles: () -> Unit,
     onOpenSettings: () -> Unit,
     onRefreshRecents: () -> Unit = {}
 ) {
@@ -140,6 +142,11 @@ fun QuarkDrawer(
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             DrawerHeader(title = "Workspace")
+            DrawerEntry(
+                label = "Workspace files",
+                icon = { Icon(Icons.Filled.Folder, contentDescription = null) },
+                onClick = onOpenFiles
+            )
             if (hasSession) {
                 DrawerEntry(
                     label = "Review changes",

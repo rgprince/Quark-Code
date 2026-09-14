@@ -35,6 +35,8 @@ import com.rg.quarkcode.settings.ProvidersScreen
 import com.rg.quarkcode.connect.ConnectScreen
 import com.rg.quarkcode.connect.ConnectViewModel
 import com.rg.quarkcode.drawer.QuarkDrawer
+import com.rg.quarkcode.files.FilesScreen
+import com.rg.quarkcode.files.FilesViewModel
 import com.rg.quarkcode.settings.SettingsScreen
 import com.rg.quarkcode.settings.SettingsViewModel
 import com.rg.quarkcode.theme.QuarkTheme
@@ -49,6 +51,7 @@ private data object SettingsRoute
 private data object ProvidersRoute
 private data object UsageRoute
 private data object DiffRoute
+private data object FilesRoute
 
 @Composable
 fun QuarkApp(modifier: Modifier = Modifier) {
@@ -78,6 +81,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
     val connectVm: ConnectViewModel = viewModel()
     val chatVm: ChatViewModel = viewModel()
     val settingsVm: SettingsViewModel = viewModel()
+    val filesVm: FilesViewModel = viewModel()
 
     LaunchedEffect(Unit) {
         val appCtx = context.applicationContext
@@ -150,6 +154,10 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                 onOpenReview = {
                     closeDrawer()
                     backStack.add(DiffRoute)
+                },
+                onOpenFiles = {
+                    closeDrawer()
+                    backStack.add(FilesRoute)
                 },
                 onOpenSettings = {
                     closeDrawer()
@@ -266,6 +274,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onShowThoughtsChange = chatVm::setShowThoughts,
                                 onClearCache = chatVm::clearLaunchCache,
                                 onOpenUsage = { backStack.add(UsageRoute) },
+                                onOpenFiles = { backStack.add(FilesRoute) },
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,
@@ -310,6 +319,48 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onConfirmScan = chatVm::scanUsage,
                                 onCancelScan = chatVm::stopScan,
                                 onPeriodChange = chatVm::setUsagePeriod
+                            )
+                        }
+                        is FilesRoute -> NavEntry(key) {
+                            FilesScreen(
+                                state = filesVm.uiState,
+                                onBack = { backStack.removeLastOrNull() },
+                                onOpen = filesVm::open,
+                                onSwitchRoot = filesVm::switchRoot,
+                                onNavigate = filesVm::navigate,
+                                onCrumb = filesVm::goCrumb,
+                                onShowHidden = filesVm::setShowHidden,
+                                onSortOpen = { filesVm.setSortOpen(true) },
+                                onSort = filesVm::setSort,
+                                onSortDismiss = { filesVm.setSortOpen(false) },
+                                onMenu = filesVm::setMenu,
+                                onSearching = filesVm::setSearching,
+                                onQuery = filesVm::setQuery,
+                                onToggleSelect = filesVm::toggleSelect,
+                                onSelectAll = filesVm::selectAll,
+                                onClearSelection = filesVm::clearSelection,
+                                onCopy = filesVm::copySelection,
+                                onCut = filesVm::cutSelection,
+                                onPaste = filesVm::paste,
+                                onClearClip = filesVm::clearClip,
+                                onCreate = filesVm::setCreate,
+                                onCreateConfirm = filesVm::confirmCreate,
+                                onRename = filesVm::setRename,
+                                onRenameConfirm = filesVm::confirmRename,
+                                onDelete = filesVm::setDelete,
+                                onDeleteConfirm = filesVm::confirmDelete,
+                                onDeleteDismiss = { filesVm.setDelete(emptyList()) },
+                                onProps = filesVm::setProps,
+                                onTextOpen = filesVm::openText,
+                                onTextEdit = filesVm::editText,
+                                onTextSave = filesVm::saveText,
+                                onTextClose = filesVm::closeText,
+                                onZipOpen = filesVm::openZip,
+                                onZipClose = filesVm::closeZip,
+                                onZipExtract = filesVm::extractZip,
+                                onImageOpen = filesVm::openImage,
+                                onImageClose = filesVm::closeImage,
+                                onNoticeShown = filesVm::clearNotice
                             )
                         }
                         else -> error("Unknown route: $key")

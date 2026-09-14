@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
@@ -111,6 +112,7 @@ fun SettingsScreen(
     onShowThoughtsChange: (Boolean) -> Unit,
     onClearCache: () -> Unit,
     onOpenUsage: () -> Unit,
+    onOpenFiles: () -> Unit,
     onNewMcpNameChange: (String) -> Unit,
     onNewMcpUrlChange: (String) -> Unit,
     onAddMcp: () -> Unit,
@@ -245,6 +247,25 @@ fun SettingsScreen(
                     item(key = "device") {
                         SettingsSection(title = "On-device backend", icon = Icons.Filled.Storage) {
                             DeviceBackendPanel()
+                        }
+                    }
+                    item(key = "files") {
+                        SettingsSection(title = "Workspace files", icon = Icons.Filled.Folder) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onOpenFiles),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "File manager", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = "Browse /workspace and the Debian system; import files from your phone",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
