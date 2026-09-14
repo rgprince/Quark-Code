@@ -196,8 +196,7 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
-## V8.8 scope — single-tool cards + 4-tab settings (screenshot feedback)
-- [x] Single-tool activity groups skip the "1 tool call" wrapper row and render
+## V8.8 scope — single-tool cards + 4-tab settings (screenshot feedback)- [x] Single-tool activity groups skip the "1 tool call" wrapper row and render
   `QuarkToolCard` directly (status dot + name + summary, expands in place);
   wrapper kept for 2+ items (`MessageList`)
 - [x] Settings 6 tabs → 4: Connection folded into Device (providers + URL +
@@ -366,4 +365,23 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
   Large 1.15, DataStore-persisted, applied to chat + composer live)
 - [x] Subagent perf/UI audit applied: bounded model sheet list, no nested
   scroll traps (Review/ServerInfo), capped chat images, keyed drawer rows,
-  progress semantics, 48dp sheet buttons, memoized schedule subtitles
+   progress semantics, 48dp sheet buttons, memoized schedule subtitles
+
+## V9 scope — workspace file manager + sandbox + F-Droid (v0.14.0, code 16)
+- [x] Files (`files/` package, zero new deps): Workspace read/write +
+  System read-only browser, Workspace/System segmented roots, breadcrumbs,
+  sort/search/hidden, multi-select copy/move/delete, create/rename, ZIP
+  list+extract (java.util.zip), text viewer+editor (2 MB cap, binary
+  refused), image viewer (Coil), props sheet; prefs in DataStore
+  (`FilesStore`: hidden/sort/last path)
+- [x] Entry points: drawer Workspace section ("Workspace files") + Settings
+  Device tab shortcut; `FilesRoute` in Nav3
+- [x] Import/export: SAF pick (no storage permission) phone → workspace;
+  Save-to-phone via CreateDocument; Share/Open-with via FileProvider
+  limited to `backend/workspace/` (`res/xml/filepaths.xml`)
+- [x] Sandbox: `FilesGate` canonical-path validator on every op, guest
+  writes rejected, guest files can never be shared out; Sandbox status
+  screen (Settings → About) states binds/workdir/loopback + sizes + copy
+- [x] F-Droid: `dist` flavors (`gplay`/`fdroid`, same ID/code, zero
+  proprietary deps in either) + `fastlane/metadata/android/en-US/`
+  (title/short/full/changelog); CI uploads per-flavor APKs

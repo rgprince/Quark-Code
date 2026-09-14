@@ -19,8 +19,8 @@ jobs:
           cache-key-prefix: 'gradle-${{ github.sha }}'
       - name: Assemble release (R8)
         run: gradle :app:assembleRelease --no-daemon
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: quark-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/*/release/*.apk

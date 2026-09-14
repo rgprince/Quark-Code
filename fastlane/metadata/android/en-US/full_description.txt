@@ -1,0 +1,9 @@
+Quark Code is a native Android client for the opencode AI coding agent.
+
+On-device mode runs the official opencode server headless inside a Debian guest (proot, no root needed) on loopback, behind a password. Remote mode talks to the same API over LAN or Tailscale.
+
+The agent is sandboxed: it sees only its /workspace plus the guest system. Files enter only when you import them through the built-in file manager, and leave only when you share them out. A Sandbox screen shows the confinement status.
+
+Features: streaming chat with tool cards and permission prompts, model/provider picker, usage stats with cost, review diffs, ZIP/text/image browsing of the workspace, Material You Expressive themes (Void/Paper/Dynamic/AMOLED).
+
+No accounts, no tracking, no proprietary dependencies. Fully offline-capable once the guest system is downloaded.

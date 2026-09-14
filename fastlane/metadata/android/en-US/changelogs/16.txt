@@ -1,0 +1,1 @@
+File manager for the agent workspace (browse /workspace + Debian system, SAF import/export, workspace-only share), Sandbox status screen, F-Droid flavor + store metadata.

@@ -12,8 +12,22 @@ android {
         applicationId = "com.rg.quarkcode"
         minSdk = 28
         targetSdk = 37
-        versionCode = 15
-        versionName = "0.13.1"
+        versionCode = 16
+        versionName = "0.14.0"
+    }
+
+    // Distribution flavors, same code and ID in both: gplay is the current
+    // artifact, fdroid exists so F-Droid can track a dedicated flavor.
+    // No proprietary dependencies exist in either (verified: no GMS,
+    // Firebase, or Play Billing anywhere in the tree).
+    flavorDimensions += "dist"
+    productFlavors {
+        create("gplay") {
+            dimension = "dist"
+        }
+        create("fdroid") {
+            dimension = "dist"
+        }
     }
 
     signingConfigs {
