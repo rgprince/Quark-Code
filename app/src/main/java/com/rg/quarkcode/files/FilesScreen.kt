@@ -1,6 +1,9 @@
 package com.rg.quarkcode.files
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -43,8 +46,11 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.BottomAppBar
@@ -138,7 +144,13 @@ fun FilesScreen(
     onZipExtract: (String?) -> Unit,
     onImageOpen: (String) -> Unit,
     onImageClose: () -> Unit,
-    onNoticeShown: () -> Unit
+    onNoticeShown: () -> Unit,
+    onImport: (List<Uri>) -> Unit,
+    onExportRequest: (String) -> Unit,
+    onExportResult: (Uri?) -> Unit,
+    onShareSelection: () -> Unit,
+    onShareFile: (String) -> Unit,
+    onOpenWith: (String) -> Unit
 ) {
     LaunchedEffect(Unit) { onOpen() }
     when {
@@ -196,7 +208,13 @@ fun FilesScreen(
             onTextOpen = onTextOpen,
             onZipOpen = onZipOpen,
             onImageOpen = onImageOpen,
-            onNoticeShown = onNoticeShown
+            onNoticeShown = onNoticeShown,
+            onImport = onImport,
+            onExportRequest = onExportRequest,
+            onExportResult = onExportResult,
+            onShareSelection = onShareSelection,
+            onShareFile = onShareFile,
+            onOpenWith = onOpenWith
         )
     }
 }
@@ -235,7 +253,13 @@ private fun BrowserBody(
     onTextOpen: (String) -> Unit,
     onZipOpen: (String) -> Unit,
     onImageOpen: (String) -> Unit,
-    onNoticeShown: () -> Unit
+    onNoticeShown: () -> Unit,
+    onImport: (List<Uri>) -> Unit,
+    onExportRequest: (String) -> Unit,
+    onExportResult: (Uri?) -> Unit,
+    onShareSelection: () -> Unit,
+    onShareFile: (String) -> Unit,
+    onOpenWith: (String) -> Unit
 ) {
     val snacks = remember { SnackbarHostState() }
     LaunchedEffect(state.notice) {
@@ -247,6 +271,21 @@ private fun BrowserBody(
     var fabMenu by remember { mutableStateOf(false) }
     val selecting = state.selection.isNotEmpty()
     val writable = state.root == FilesGate.Root.WORKSPACE
+    // SAF launchers: no storage permission needed; the user picks exactly
+    // what enters/leaves the sandbox, one transfer at a time.
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) onImport(uris)
+    }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*")
+    ) { uri ->
+        onExportResult(uri)
+    }
+    LaunchedEffect(state.exportSource) {
+        state.exportSource?.let { exportLauncher.launch(state.exportName.ifEmpty { "file" }) }
+    }
     val shown = if (state.searching) state.searchHits else state.entries
     val folderName = state.relative.substringAfterLast('/').ifEmpty { FilesGate.label(state.root) }
 
@@ -338,6 +377,18 @@ private fun BrowserBody(
                                 },
                                 onClick = { onShowHidden(!state.showHidden) }
                             )
+                            if (writable) {
+                                DropdownMenuItem(
+                                    text = { Text("Import from phone…") },
+                                    leadingIcon = {
+                                        Icon(Icons.Filled.Upload, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        onMenu(false)
+                                        importLauncher.launch(arrayOf("*/*"))
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -376,6 +427,7 @@ private fun BrowserBody(
                     BottomAppBar {
                         Spacer(modifier = Modifier.width(4.dp))
                         TextButton(onClick = onCopy) { Text("Copy") }
+                        TextButton(onClick = onShareSelection) { Text("Share") }
                         if (writable) {
                             TextButton(onClick = onCut) { Text("Move") }
                             TextButton(
@@ -423,6 +475,16 @@ private fun BrowserBody(
                             onClick = {
                                 fabMenu = false
                                 onCreate(true, false)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Import from phone…") },
+                            leadingIcon = {
+                                Icon(Icons.Filled.Upload, contentDescription = null)
+                            },
+                            onClick = {
+                                fabMenu = false
+                                importLauncher.launch(arrayOf("*/*"))
                             }
                         )
                     }
@@ -695,6 +757,43 @@ private fun BrowserBody(
                                 onProps(null)
                                 onDelete(listOf(target))
                             }) { Text("Delete") }
+                        }
+                    }
+                    val isFile = entry?.isDir == false
+                    if (isFile) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                onProps(null)
+                                onShareFile(target)
+                            }) {
+                                Icon(
+                                    Icons.Filled.Share,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Share")
+                            }
+                            OutlinedButton(onClick = {
+                                onProps(null)
+                                onExportRequest(target)
+                            }) {
+                                Icon(
+                                    Icons.Filled.SaveAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Save")
+                            }
+                        }
+                        if (writable) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedButton(onClick = {
+                                onProps(null)
+                                onOpenWith(target)
+                            }) { Text("Open with…") }
                         }
                     }
                 }

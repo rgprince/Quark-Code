@@ -50,7 +50,10 @@ data class FilesUiState(
     val zipEntries: List<FilesRepo.ZipNode> = emptyList(),
     val zipBusy: Boolean = false,
     val imageTarget: String? = null,
-    val imageFile: File? = null
+    val imageFile: File? = null,
+    /** SAF "save to phone" flow: workspace source + suggested name. */
+    val exportSource: String? = null,
+    val exportName: String = ""
 )
 
 /**
@@ -487,4 +490,119 @@ class FilesViewModel(application: Application) : AndroidViewModel(application) {
     fun closeImage() { uiState = uiState.copy(imageTarget = null, imageFile = null) }
 
     fun clearNotice() { uiState = uiState.copy(notice = null) }
+
+    // --- SAF import (phone → workspace; the ONLY way in) ---
+
+    /** Copies SAF-picked documents into the current workspace folder. */
+    fun importUris(uris: List<android.net.Uri>) {
+        if (uris.isEmpty()) return
+        val snap = uiState
+        viewModelScope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                val ws = rootDir(FilesGate.Root.WORKSPACE)
+                ws.mkdirs()
+                val dstDir = if (snap.root == FilesGate.Root.WORKSPACE) {
+                    FilesGate.resolve(app, FilesGate.Root.WORKSPACE, snap.relative)
+                        ?.takeIf { it.isDirectory }
+                } else {
+                    null
+                } ?: ws
+                var done = 0
+                var failed = 0
+                val resolver = app.contentResolver
+                for (uri in uris) {
+                    val ok = runCatching {
+                        val displayName = resolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val idx = cursor.getColumnIndex(
+                                android.provider.OpenableColumns.DISPLAY_NAME
+                            )
+                            if (cursor.moveToFirst() && idx >= 0) cursor.getString(idx) else null
+                        } ?: "import-${System.currentTimeMillis()}"
+                        val safe = displayName.substringAfterLast('/').trim().takeIf { it.isNotEmpty() }
+                            ?: "import-${System.currentTimeMillis()}"
+                        val dst = freeName(dstDir, safe)
+                        resolver.openInputStream(uri)?.use { ins ->
+                            dst.outputStream().use { outs -> ins.copyTo(outs) }
+                        } ?: return@runCatching false
+                        // Refuse to land outside the sandbox even if freeName glitched.
+                        FilesGate.contains(ws.canonicalFile, dst.canonicalFile)
+                    }.getOrDefault(false)
+                    if (ok) done++ else failed++
+                }
+                when {
+                    done > 0 && failed == 0 -> "Imported $done file(s) into Workspace"
+                    done > 0 -> "Imported $done, $failed failed"
+                    else -> "Import failed"
+                }
+            }
+            uiState = uiState.copy(notice = outcome)
+            refresh()
+        }
+    }
+
+    // --- SAF export (workspace → phone; user-driven only) ---
+
+    fun setExport(source: String?) {
+        if (source == null) {
+            uiState = uiState.copy(exportSource = null, exportName = "")
+            return
+        }
+        uiState = uiState.copy(exportSource = source, exportName = source.substringAfterLast('/'))
+    }
+
+    fun exportTo(uri: android.net.Uri?) {
+        val source = uiState.exportSource
+        uiState = uiState.copy(exportSource = null, exportName = "")
+        if (source == null || uri == null) return
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                val ws = rootDir(FilesGate.Root.WORKSPACE)
+                val src = FilesGate.resolve(app, uiState.root, source)
+                    ?.takeIf { it.isFile }
+                    ?: return@withContext false
+                // Workspace-only: guest system files can never leave the sandbox.
+                if (!FilesGate.contains(ws.canonicalFile, src.canonicalFile)) return@withContext false
+                runCatching {
+                    app.contentResolver.openOutputStream(uri)?.use { outs ->
+                        src.inputStream().use { ins -> ins.copyTo(outs) }
+                    } ?: return@withContext false
+                    true
+                }.getOrDefault(false)
+            }
+            uiState = uiState.copy(notice = if (ok) "Saved to phone" else "Couldn't save file")
+        }
+    }
+
+    // --- share / open-with (workspace files only) ---
+
+    fun shareSelection() {
+        val snap = uiState
+        val ws = rootDir(FilesGate.Root.WORKSPACE)
+        val files = snap.selection.mapNotNull { rel ->
+            FilesGate.resolve(app, snap.root, rel)?.takeIf { it.isFile }
+        }
+        if (!ShareKit.share(app, ws, files)) {
+            uiState = snap.copy(notice = "Nothing shareable — only Workspace files can leave the sandbox")
+        } else {
+            uiState = snap.copy(selection = emptySet())
+        }
+    }
+
+    fun shareFile(relative: String) {
+        val snap = uiState
+        val ws = rootDir(FilesGate.Root.WORKSPACE)
+        val file = FilesGate.resolve(app, snap.root, relative)?.takeIf { it.isFile }
+        if (file == null || !ShareKit.share(app, ws, listOf(file))) {
+            uiState = snap.copy(notice = "Only Workspace files can leave the sandbox")
+        }
+    }
+
+    fun openWith(relative: String) {
+        val snap = uiState
+        val ws = rootDir(FilesGate.Root.WORKSPACE)
+        val file = FilesGate.resolve(app, snap.root, relative)?.takeIf { it.isFile }
+        if (file == null || !ShareKit.openWith(app, ws, file)) {
+            uiState = snap.copy(notice = "Only Workspace files can be opened outside the sandbox")
+        }
+    }
 }

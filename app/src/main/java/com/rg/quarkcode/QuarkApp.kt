@@ -360,7 +360,13 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onZipExtract = filesVm::extractZip,
                                 onImageOpen = filesVm::openImage,
                                 onImageClose = filesVm::closeImage,
-                                onNoticeShown = filesVm::clearNotice
+                                onNoticeShown = filesVm::clearNotice,
+                                onImport = filesVm::importUris,
+                                onExportRequest = filesVm::setExport,
+                                onExportResult = filesVm::exportTo,
+                                onShareSelection = filesVm::shareSelection,
+                                onShareFile = filesVm::shareFile,
+                                onOpenWith = filesVm::openWith
                             )
                         }
                         else -> error("Unknown route: $key")

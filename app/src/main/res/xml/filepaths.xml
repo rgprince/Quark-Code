@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sandbox: ONLY the agent workspace is ever exposed outside the app.
+     The Debian guest tree, caches and prefs are never shareable. -->
+<paths>
+    <files-path name="workspace" path="backend/workspace/" />
+</paths>

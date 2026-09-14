@@ -26,5 +26,16 @@
             android:name=".backend.QuarkBackendService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <!-- Workspace-only share surface (see res/xml/filepaths.xml):
+             the agent sandbox can never exfiltrate guest system files. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
     </application>
 </manifest>
