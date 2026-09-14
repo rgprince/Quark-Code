@@ -229,12 +229,73 @@ object DebianInstaller {
             parentFile?.mkdirs()
             writeText("nameserver 8.8.8.8\nnameserver 1.1.1.1\n")
         }
+        // Loopback + hostname: Bun/Node health checks resolve localhost;
+        // a bare proot-distro rootfs sometimes ships an empty hosts file.
+        File(guest, "etc/hosts").apply {
+            parentFile?.mkdirs()
+            if (!isFile || length() == 0L) {
+                writeText("127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n")
+            }
+        }
         report(STAGE_CONFIGURE, 0.6f, "certificates…")
         copySystemCaBundle(guest)
         File(guest, "workspace").mkdirs()
+        File(guest, "tmp").mkdirs()
         File(guest, "root/.opencode").mkdirs()
+        // PATH + xdg-open shims (see ensureGuestShims): login shells reset
+        // PATH to Debian defaults, so /root/.opencode/bin is invisible;
+        // and any `xdg-open` spawn (desktop `opencode web` habit, scripts)
+        // must no-op instead of killing the server with ENOENT.
+        ensureGuestShims(guest)
         File(guest, MARKER_NAME).writeText(version)
         report(STAGE_CONFIGURE, 1f, "done")
+    }
+
+    /**
+     * Idempotent self-heal, safe to call from anywhere (Debian configure,
+     * opencode install, pre-start): links the server binary into the
+     * default PATH and provides a no-op xdg-open fallback.
+     */
+    fun ensureGuestShims(guest: File) {
+        runCatching {
+            val binTarget = File(guest, "root/.opencode/bin/opencode")
+            val linkDir = File(guest, "usr/local/bin").apply { mkdirs() }
+            val link = File(linkDir, "opencode")
+            if (binTarget.isFile) {
+                runCatching {
+                    if (java.nio.file.Files.isSymbolicLink(link.toPath())) {
+                        java.nio.file.Files.deleteIfExists(link.toPath())
+                    } else if (link.exists()) {
+                        link.delete()
+                    }
+                    java.nio.file.Files.createSymbolicLink(
+                        link.toPath(),
+                        java.nio.file.Paths.get("/root/.opencode/bin/opencode")
+                    )
+                }.onFailure {
+                    // Symlinks restricted (odd filesystem) — copy instead.
+                    runCatching {
+                        binTarget.copyTo(link, overwrite = true)
+                        link.setExecutable(true, false)
+                    }
+                }
+            }
+        }
+        runCatching {
+            val shimText = "#!/bin/sh\nexit 0\n"
+            for (path in listOf("usr/local/bin/xdg-open", "usr/bin/xdg-open")) {
+                val shim = File(guest, path)
+                runCatching {
+                    // Never overwrite a real desktop xdg-open if the rootfs
+                    // ever ships one — only fill the gap.
+                    if (!shim.isFile) {
+                        shim.parentFile?.mkdirs()
+                        shim.writeText(shimText)
+                        shim.setExecutable(true, false)
+                    }
+                }
+            }
+        }
     }
 
     /**

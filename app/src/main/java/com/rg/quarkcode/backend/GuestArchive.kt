@@ -117,9 +117,28 @@ object GuestArchive {
             }
         }
         // Deepest first so parent links resolve after their targets exist.
+        // Merged-/usr rootfs (Debian trixie) is symlink-heavy: /bin, /lib,
+        // /sbin are relative links (bin -> usr/bin, lib -> usr/lib). The
+        // tar may also contain real files under those names if entries were
+        // materialized as dirs before their link entry arrived — a stale
+        // directory where a symlink belongs breaks the loader path
+        // (/lib/ld-linux-aarch64.so.1) and surfaces as execve ENOENT
+        // ("No such file or directory"). So always replace: delete whatever
+        // is there (dir or file or stale link) and recreate the exact link.
         pendingLinks.sortByDescending { (target, _) -> target.path.count { it == File.separatorChar } }
         for ((target, linkName) in pendingLinks) {
             runCatching {
+                if (java.nio.file.Files.isSymbolicLink(target.toPath())) {
+                    java.nio.file.Files.deleteIfExists(target.toPath())
+                } else if (target.isDirectory) {
+                    // Only delete if empty — a non-empty dir means real
+                    // content was extracted there; keep it and skip the link
+                    // (normalizeRootfs/loader still finds usr/ originals).
+                    if (target.listFiles()?.isEmpty() != false) target.deleteRecursively()
+                    else continue
+                } else if (target.exists()) {
+                    target.delete()
+                }
                 if (target.exists() || java.nio.file.Files.isSymbolicLink(target.toPath())) return@runCatching
                 target.parentFile?.mkdirs()
                 java.nio.file.Files.createSymbolicLink(target.toPath(), java.nio.file.Paths.get(linkName))

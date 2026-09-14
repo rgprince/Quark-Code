@@ -72,24 +72,50 @@ object LocalBackend {
             "--sysvipc",
             "-r", guest.absolutePath,
             "-w", "/workspace",
+            // Host device nodes the Bun/Node runtime needs (/dev/urandom,
+            // /proc/self/maps). PRoot emulates part of /proc, but explicit
+            // binds match the Termux proot-distro recipe and cost nothing.
+            "-b", "/dev:/dev",
+            "-b", "/proc:/proc",
             "-b", "${RuntimeFiles.workspace(context).absolutePath}:/workspace"
         )
     }
 
-    private fun guestEnv(
-        context: Context,
-        suite: ProotSuite.Paths,
-        password: String
-    ): Map<String, String> {
-        val env = HashMap(suite.baseEnv())
-        env["HOME"] = "/root"
-        env["PATH"] = "/root/.opencode/bin:/usr/local/bin:/usr/bin:/bin"
-        env["TERM"] = "dumb"
-        env["LANG"] = "C.UTF-8"
-        env["OPENCODE_SERVER_PASSWORD"] = password
-        env["OPENCODE_DISABLE_AUTOUPDATE"] = "true"
-        env.remove("TMPDIR")
-        return env
+    /**
+     * Clean environment seen INSIDE the Debian guest, passed via
+     * `/usr/bin/env -i` so host loader paths (LD_LIBRARY_PATH for the
+     * proot binary itself, any stray LD_PRELOAD from the app process)
+     * never leak into glibc binaries — that leak is the classic silent
+     * execve/linker death ("No such file or directory", dynamic symbol
+     * collisions). The host env for the proot process itself stays in
+     * [ProotSuite.Paths.baseEnv] and is set on the ProcessBuilder, not here.
+     */
+    private fun guestCleanEnv(password: String): List<String> {
+        val path = "/root/.opencode/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        return listOf(
+            "HOME=/root",
+            "PATH=$path",
+            "TERM=dumb",
+            "LANG=C.UTF-8",
+            "LC_ALL=C.UTF-8",
+            "TMPDIR=/tmp",
+            "TZ=UTC",
+            "XDG_RUNTIME_DIR=/tmp",
+            // Belt-and-braces for the desktop `opencode web` habit: even in
+            // `serve` mode a spawned helper must open nothing and exit 0
+            // (shim installed by DebianInstaller.ensureGuestShims).
+            "BROWSER=/usr/local/bin/xdg-open",
+            "OPENCODE_SERVER_PASSWORD=$password",
+            "OPENCODE_DISABLE_AUTOUPDATE=true"
+        )
+    }
+
+    /** Host-side env for the proot process itself (loader paths stay here). */
+    private fun hostEnv(suite: ProotSuite.Paths): Map<String, String> {
+        // suite.baseEnv() already carries LD_LIBRARY_PATH (libsDir first so
+        // libtalloc.so.2 resolves), PROOT_LOADER(_32), PROOT_TMP_DIR. Never
+        // add LD_PRELOAD here — Termux's Bionic wrapper poisons glibc guests.
+        return HashMap(suite.baseEnv())
     }
 
     /**
@@ -128,6 +154,9 @@ object LocalBackend {
             RuntimeFiles.ensureDirs(context)
             val store = RuntimeStore(context.applicationContext)
             val password = store.password()
+            // Self-heal PATH + xdg-open shims (cheap, idempotent): covers
+            // installs from before the shim era and manual guest edits.
+            runCatching { DebianInstaller.ensureGuestShims(RuntimeFiles.guest(context)) }
             // Dead-binary guard: v0.0.x (archived Go repo) has no server
             // mode — launching it only prints usage. Fail fast with the
             // fix instead of a cryptic log.
@@ -149,16 +178,25 @@ object LocalBackend {
                 return@withContext true
             }
             val cmd = guestBase(context, suite)
-            // sst/opencode (v1.x) supports these; the archived Go binary
-            // (v0.0.55) does not — but that binary has no server mode at
-            // all, so it can never be the backend (see GuestOpencode).
+            // NEVER `opencode web` here: web is hardcoded for desktop Linux
+            // and spawns `xdg-open http://…` after boot — with no X11/Wayland
+            // session the spawn throws ENOENT and kills the whole Bun server.
+            // `serve` is the headless mode: no browser spawn, same API.
+            // env -i: the guest must see ONLY the clean list (no
+            // LD_LIBRARY_PATH/LD_PRELOAD from the host proot env).
+            cmd.addAll(listOf("/usr/bin/env", "-i"))
+            cmd.addAll(guestCleanEnv(password))
             cmd.addAll(listOf(GuestOpencode.GUEST_BIN, "serve", "--port", PORT.toString(), "--hostname", "127.0.0.1"))
             val pb = ProcessBuilder(cmd)
             pb.directory(RuntimeFiles.workspace(context))
             pb.redirectErrorStream(true)
             val env = pb.environment()
             env.clear()
-            env.putAll(guestEnv(context, suite, password))
+            // Host env ONLY: loader paths for proot itself. Guest isolation
+            // comes from `env -i` above. Clearing first also strips any
+            // LD_PRELOAD inherited from the app process (Termux Bionic
+            // wrapper would otherwise poison glibc).
+            env.putAll(hostEnv(suite))
             _state.value = State.Starting
             appendLog("$ opencode serve --port $PORT (official, Debian guest)")
             val proc = pb.start()
@@ -173,7 +211,12 @@ object LocalBackend {
             repeat(60) {
                 delay(1000L)
                 if (!isAlive()) {
-                    _state.value = State.Stopped("Server process died during startup — see logs")
+                    // Was: generic "died during startup — see logs" (the
+                    // silent-fail complaint). Now the tail rides along so the
+                    // Device tab shows the linker/execve reason inline.
+                    _state.value = State.Stopped(
+                        "Server died during startup: ${recentLogs(5)}"
+                    )
                     return@withContext false
                 }
                 if (checkHealth(password)) {
@@ -182,7 +225,7 @@ object LocalBackend {
                     return@withContext true
                 }
             }
-            _state.value = State.Stopped("Backend did not answer in 60s — see logs")
+            _state.value = State.Stopped("Backend silent 60s (no /global/health): ${recentLogs(5)}")
             return@withContext false
         } catch (e: Exception) {
             _state.value = State.Stopped(e.message?.take(200) ?: "Could not start backend")
@@ -201,13 +244,17 @@ object LocalBackend {
         val suite = ProotSuite(context, RuntimeFiles.root(context)).ensureInstalled()
         val store = RuntimeStore(context.applicationContext)
         val cmd = guestBase(context, suite)
+        // Same env -i isolation as start(): apt/dpkg/ripgrep die the same
+        // silent linker death if LD_LIBRARY_PATH leaks into the guest.
+        cmd.addAll(listOf("/usr/bin/env", "-i"))
+        cmd.addAll(guestCleanEnv(store.password()))
         cmd.addAll(args)
         val pb = ProcessBuilder(cmd)
         pb.directory(RuntimeFiles.workspace(context))
         pb.redirectErrorStream(true)
         val env = pb.environment()
         env.clear()
-        env.putAll(guestEnv(context, suite, store.password()))
+        env.putAll(hostEnv(suite))
         val proc = pb.start()
         val out = StringBuilder()
         val reader = thread(isDaemon = true, name = "guest-cmd") {
@@ -251,6 +298,13 @@ object LocalBackend {
         .connectTimeout(3, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
         .build()
+
+    /** Last N log lines inline for Stopped errors (kills the silent fail). */
+    private fun recentLogs(n: Int): String {
+        val tail = _logs.value.takeLast(n).filter { it.isNotBlank() }
+        if (tail.isEmpty()) return "no output — reinstall Debian + opencode (Device tab)"
+        return tail.joinToString(" | ").take(320)
+    }
 
     private fun checkHealth(password: String): Boolean {
         // New server: /global/health. Old v0.0.55 Go server: /health.

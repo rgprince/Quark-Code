@@ -158,7 +158,7 @@ fun ConnectScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Same phone: start the server first — in Termux run: opencode serve --port 4096 (or opencode web --port 4096).",
+                text = "Same phone: start the server first — in Termux run: opencode serve --port 4096 --hostname 127.0.0.1 (never `web` on-device: it spawns xdg-open and kills the server).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

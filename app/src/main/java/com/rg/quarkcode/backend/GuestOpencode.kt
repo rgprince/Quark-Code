@@ -172,6 +172,11 @@ object GuestOpencode {
                 nested.copyTo(bin, overwrite = true)
             }
             bin.setExecutable(true, false)
+            // PATH + xdg-open self-heal: login shells reset PATH to Debian
+            // defaults (no /root/.opencode/bin), so link the binary into
+            // /usr/local/bin; also drop a no-op xdg-open so nothing can
+            // kill the server with a spawn ENOENT.
+            runCatching { DebianInstaller.ensureGuestShims(RuntimeFiles.guest(context)) }
             report(STAGE_VERIFY, 1f, "v${asset.version} ready")
         }
     }
