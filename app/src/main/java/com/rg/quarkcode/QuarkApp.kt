@@ -37,6 +37,7 @@ import com.rg.quarkcode.connect.ConnectViewModel
 import com.rg.quarkcode.drawer.QuarkDrawer
 import com.rg.quarkcode.files.FilesScreen
 import com.rg.quarkcode.files.FilesViewModel
+import com.rg.quarkcode.files.SandboxScreen
 import com.rg.quarkcode.settings.SettingsScreen
 import com.rg.quarkcode.settings.SettingsViewModel
 import com.rg.quarkcode.theme.QuarkTheme
@@ -52,6 +53,7 @@ private data object ProvidersRoute
 private data object UsageRoute
 private data object DiffRoute
 private data object FilesRoute
+private data object SandboxRoute
 
 @Composable
 fun QuarkApp(modifier: Modifier = Modifier) {
@@ -275,6 +277,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onClearCache = chatVm::clearLaunchCache,
                                 onOpenUsage = { backStack.add(UsageRoute) },
                                 onOpenFiles = { backStack.add(FilesRoute) },
+                                onOpenSandbox = { backStack.add(SandboxRoute) },
                                 onNewMcpNameChange = settingsVm::onNewMcpNameChange,
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,
@@ -367,6 +370,11 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onShareSelection = filesVm::shareSelection,
                                 onShareFile = filesVm::shareFile,
                                 onOpenWith = filesVm::openWith
+                            )
+                        }
+                        is SandboxRoute -> NavEntry(key) {
+                            SandboxScreen(
+                                onBack = { backStack.removeLastOrNull() }
                             )
                         }
                         else -> error("Unknown route: $key")

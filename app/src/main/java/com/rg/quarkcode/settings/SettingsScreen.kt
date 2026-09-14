@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AssistChip
@@ -113,6 +114,7 @@ fun SettingsScreen(
     onClearCache: () -> Unit,
     onOpenUsage: () -> Unit,
     onOpenFiles: () -> Unit,
+    onOpenSandbox: () -> Unit,
     onNewMcpNameChange: (String) -> Unit,
     onNewMcpUrlChange: (String) -> Unit,
     onAddMcp: () -> Unit,
@@ -531,6 +533,25 @@ fun SettingsScreen(
                     item(key = "about") {
                         SettingsSection(title = "About Quark Code", icon = Icons.Filled.Info) {
                             AboutInfo()
+                        }
+                    }
+                    item(key = "sandbox") {
+                        SettingsSection(title = "Sandbox", icon = Icons.Filled.Lock) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onOpenSandbox),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Sandbox status", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = "What the agent can see, how files enter and leave",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
