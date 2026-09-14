@@ -31,8 +31,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.rg.quarkcode.chat.RecentSession
 
@@ -54,6 +56,25 @@ fun QuarkDrawer(
         modifier = modifier.width(320.dp),
         drawerShape = RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp)
     ) {
+        val context = LocalContext.current
+        // Real version, not a hardcoded string (was stale v0.1.0).
+        val versionLine = remember(context) {
+            runCatching {
+                val pm = context.packageManager
+                val pkg = if (android.os.Build.VERSION.SDK_INT >=
+                    android.os.Build.VERSION_CODES.TIRAMISU
+                ) {
+                    pm.getPackageInfo(
+                        context.packageName,
+                        android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.getPackageInfo(context.packageName, 0)
+                }
+                "native opencode · v${pkg.versionName}"
+            }.getOrDefault("native opencode")
+        }
         Column(
             modifier = Modifier
                 .fillMaxHeight()
@@ -86,7 +107,7 @@ fun QuarkDrawer(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "native opencode · v0.1.0",
+                        text = versionLine,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
