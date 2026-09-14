@@ -196,6 +196,16 @@ Single `:app` module, debug APK < 25 MB (opencode-android class, not Kai class).
 - [x] Audit: RichText parser termination + regex precedence verified, nested
   clickables safe, dead spacesSheet left dormant intentionally
 
+## V8.8 scope — single-tool cards + 4-tab settings (screenshot feedback)
+- [x] Single-tool activity groups skip the "1 tool call" wrapper row and render
+  `QuarkToolCard` directly (status dot + name + summary, expands in place);
+  wrapper kept for 2+ items (`MessageList`)
+- [x] Settings 6 tabs → 4: Connection folded into Device (providers + URL +
+  on-device backend = three ways to reach the same server), Chat folded into
+  Look (appearance + chat behavior), Stats renamed About (Usage row + app
+  version/package/backend/sources + Copy app info)
+- [x] Minor: doubled spacer in Chat section removed
+
 ## V8.6 scope — Read Aloud purge + resolve hardening (screenshot bug)
 - [x] Screenshot `Pinned opencode v1.18.25 has no linux-arm64 build listed` was a stale APK (old `sst/opencode .zip-only` filter); tree already resolves `anomalyco tar.gz`. Hardened with tolerant fallback (exact tarball → any linux-arm64 tarball → legacy zip) + full error text (320 chars, cache cleared on resolve fail)
 - [x] Read Aloud removed end-to-end (user: chat clutter): `onSpeak`/speaker `48dp` footer gone, `autoSpeak/speakingId` state + `AUTO_SPEAK` prefs + `speakable()` + TTS VM block deleted, Settings `Read replies aloud` row gone; `RECORD_AUDIO` + mic `RecognizerIntent` kept

@@ -19,7 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AssistChip
@@ -52,17 +52,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.rg.quarkcode.backend.GuestOpencode
+import com.rg.quarkcode.backend.LocalBackend
 import com.rg.quarkcode.backend.ThemeMode
 
+// Four tabs: Device owns the connection (remote URL + on-device backend are
+// two ways to reach the same server), Look owns everything visual including
+// chat behavior, MCP stays alone, About owns usage + app info.
 private enum class SettingsTab(val label: String) {
-    CONNECTION("Connection"),
     DEVICE("Device"),
     APPEARANCE("Look"),
-    CHAT("Chat"),
     MCP("MCP"),
-    STATS("Stats")
+    ABOUT("About")
 }
 
 private fun themeLabel(mode: ThemeMode): String = when (mode) {
@@ -149,7 +155,7 @@ fun SettingsScreen(
         ) {
             item(key = "top-space") { Spacer(modifier = Modifier.height(4.dp)) }
             when (SettingsTab.entries[tab]) {
-                SettingsTab.CONNECTION -> {
+                SettingsTab.DEVICE -> {
                     item(key = "providers") {
                         SettingsSection(title = "Default provider", icon = Icons.Filled.Storage) {
                             Row(
@@ -236,8 +242,6 @@ fun SettingsScreen(
                             }
                         }
                     }
-                }
-                SettingsTab.DEVICE -> {
                     item(key = "device") {
                         SettingsSection(title = "On-device backend", icon = Icons.Filled.Storage) {
                             DeviceBackendPanel()
@@ -346,7 +350,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-                SettingsTab.CHAT -> {
                     item(key = "chat") {
                         SettingsSection(title = "Chat", icon = Icons.Filled.Chat) {
                             ChatToggle(
@@ -355,7 +358,6 @@ fun SettingsScreen(
                                 checked = detailedTools,
                                 onCheckedChange = onDetailedChange
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier
@@ -486,9 +488,9 @@ fun SettingsScreen(
                         }
                     }
                 }
-                SettingsTab.STATS -> {
+                SettingsTab.ABOUT -> {
                     item(key = "stats") {
-                        SettingsSection(title = "Stats", icon = Icons.Filled.PieChart) {
+                        SettingsSection(title = "Usage", icon = Icons.Filled.Info) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -506,10 +508,105 @@ fun SettingsScreen(
                             }
                         }
                     }
+                    item(key = "about") {
+                        SettingsSection(title = "About Quark Code", icon = Icons.Filled.Info) {
+                            AboutInfo()
+                        }
+                    }
                 }
             }
             item(key = "bottom-space") { Spacer(modifier = Modifier.height(16.dp)) }
         }
+    }
+}
+
+@Composable
+private fun AboutInfo(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val pkg = remember(context) {
+        runCatching {
+            val pm = context.packageManager
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(
+                    context.packageName,
+                    android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(context.packageName, 0)
+            }
+        }.getOrNull()
+    }
+    // Long version code needs API 28+ — minSdk is 28, so versionCodeMajor is safe.
+    val versionLine = if (pkg != null) {
+        "v${pkg.versionName} (${pkg.longVersionCode})"
+    } else {
+        "unknown version"
+    }
+    val infoText =
+        "Quark Code $versionLine\n" +
+            "${context.packageName}\n" +
+            "On-device backend: opencode ${GuestOpencode.PINNED_TAG} (serve, 127.0.0.1:${LocalBackend.PORT})\n" +
+            "Sources: github.com/anomalyco/opencode · termux/proot-distro"
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "Quark Code $versionLine",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Native Android client for opencode. On-device mode runs the " +
+                "official opencode ${GuestOpencode.PINNED_TAG} server (headless " +
+                "`serve` on 127.0.0.1:${LocalBackend.PORT}) inside a Debian guest " +
+                "(proot, no root needed). Remote mode talks to the same API " +
+                "over LAN/Tailscale.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        AboutFact(label = "Package", value = context.packageName)
+        AboutFact(
+            label = "Backend",
+            value = "opencode ${GuestOpencode.PINNED_TAG} · serve :${LocalBackend.PORT}"
+        )
+        AboutFact(label = "Sources", value = "anomalyco/opencode · proot-distro")
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { clipboard.setText(AnnotatedString(infoText)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Text("Copy app info")
+        }
+    }
+}
+
+@Composable
+private fun AboutFact(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(72.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

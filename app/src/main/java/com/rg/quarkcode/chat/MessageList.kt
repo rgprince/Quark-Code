@@ -220,6 +220,25 @@ fun MessageList(
                     val running = entry.parts.filterIsInstance<ChatPart.Tool>().any {
                         it.status == ToolStatus.RUNNING || it.status == ToolStatus.PENDING
                     }
+                    // Single tool, no patches: skip the "1 tool call" wrapper
+                    // row entirely and show the tool card itself (status dot +
+                    // name + summary inline, expands in place). The wrapper
+                    // only earns its keep for 2+ items.
+                    val singleTool = entry.parts.filterIsInstance<ChatPart.Tool>().singleOrNull()
+                    val patchCount = entry.parts.filterIsInstance<ChatPart.Patch>().size
+                    if (singleTool != null && patchCount == 0 &&
+                        (singleTool.name != "todowrite" || singleTool.todos.isEmpty())
+                    ) {
+                        Column(modifier = Modifier.animateItem()) {
+                            QuarkToolCard(
+                                part = singleTool,
+                                messageId = "",
+                                detailed = detailedTools,
+                                onToggleTodo = onToggleTodo
+                            )
+                        }
+                        return@itemsIndexed
+                    }
                     Column(modifier = Modifier.animateItem()) {
                         AssistantActivityRow(
                             parts = entry.parts,
