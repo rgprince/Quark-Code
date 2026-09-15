@@ -593,7 +593,9 @@ private fun AboutInfo(modifier: Modifier = Modifier) {
     val infoText =
         "Quark Code $versionLine\n" +
             "${context.packageName}\n" +
-            "On-device backend: opencode ${GuestOpencode.PINNED_TAG} (serve, 127.0.0.1:${LocalBackend.PORT})\n" +
+            "License: GPL-3.0 (sole author, no outside commits)\n" +
+            "On-device backend: opencode ${GuestOpencode.PINNED_TAG} (MIT, serve, 127.0.0.1:${LocalBackend.PORT})\n" +
+            "Debian: mixed, proot GPL-2.0, Commons-Compress Apache-2.0\n" +
             "Sources: github.com/anomalyco/opencode · termux/proot-distro"
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -618,6 +620,26 @@ private fun AboutInfo(modifier: Modifier = Modifier) {
             value = "opencode ${GuestOpencode.PINNED_TAG} · serve :${LocalBackend.PORT}"
         )
         AboutFact(label = "Sources", value = "anomalyco/opencode · proot-distro")
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "License",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Quark Code is GPL-3.0 (sole author, no outside commits). " +
+                "On-device pieces run as separate processes: opencode MIT, " +
+                "Debian mixed, proot GPL-2.0, Commons-Compress Apache-2.0, " +
+                "Bun MIT. Flow ideas studied from AndCode (MIT), all code rewritten.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        AboutFact(label = "App", value = "GPL-3.0")
+        AboutFact(label = "opencode", value = "MIT")
+        AboutFact(label = "proot", value = "GPL-2.0")
+        AboutFact(label = "Compress", value = "Apache-2.0")
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedButton(
             onClick = { clipboard.setText(AnnotatedString(infoText)) },
