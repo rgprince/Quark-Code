@@ -371,9 +371,9 @@ fun MessageList(
     }
 }
 
-// Thought line: italic tertiary text with a tertiary side bar, sitting just
-// above the model response. Time sits beside the label ("Thought · 16ms");
-// tap expands the reasoning text.
+// Thought line: DONE history in neutral tone (not tertiary) so it never
+// twins the live "thinking…" tail below. Time sits beside the label
+// ("Thought · 16ms"); tap expands the reasoning text.
 @Composable
 private fun ThoughtDoneRow(
     ms: Long?,
@@ -396,21 +396,21 @@ private fun ThoughtDoneRow(
                     .width(3.dp)
                     .height(16.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.tertiary)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant)
             )
             Text(
                 text = if (ms != null) "Thought · ${formatDuration(ms)}" else "Thought",
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontStyle = FontStyle.Italic
                 ),
-                color = MaterialTheme.colorScheme.tertiary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
             if (text.isNotBlank()) {
                 Icon(
                     imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     contentDescription = if (expanded) "Hide reasoning" else "Show reasoning",
-                    tint = MaterialTheme.colorScheme.tertiary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(14.dp)
                 )
             }
