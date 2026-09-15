@@ -16,6 +16,7 @@ class ChatPrefs(private val context: Context) {
 
     private object Keys {
         val DETAILED_TOOLS = booleanPreferencesKey("detailed_tools")
+        val WELCOME_SEEN = booleanPreferencesKey("welcome_seen")
         val SEND_BEHAVIOR = stringPreferencesKey("send_behavior")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val AUTO_SCROLL = booleanPreferencesKey("auto_scroll")
@@ -27,6 +28,7 @@ class ChatPrefs(private val context: Context) {
 
     data class Prefs(
         val detailed: Boolean = false,
+        val welcomeSeen: Boolean = false,
         val sendBehavior: String = "interrupt",
         val textScale: Float = 1f,
         val autoScroll: Boolean = true,
@@ -39,6 +41,7 @@ class ChatPrefs(private val context: Context) {
     val prefs: Flow<Prefs> = context.chatPrefsDataStore.data.map {
         Prefs(
             detailed = it[Keys.DETAILED_TOOLS] == true,
+            welcomeSeen = it[Keys.WELCOME_SEEN] == true,
             sendBehavior = it[Keys.SEND_BEHAVIOR] ?: "interrupt",
             textScale = (it[Keys.TEXT_SCALE] ?: 1f).coerceIn(0.8f, 1.3f),
             autoScroll = it[Keys.AUTO_SCROLL] ?: true,
@@ -51,6 +54,10 @@ class ChatPrefs(private val context: Context) {
 
     suspend fun setDetailed(value: Boolean) {
         context.chatPrefsDataStore.edit { it[Keys.DETAILED_TOOLS] = value }
+    }
+
+    suspend fun setWelcomeSeen(value: Boolean) {
+        context.chatPrefsDataStore.edit { it[Keys.WELCOME_SEEN] = value }
     }
 
     suspend fun setSendBehavior(value: String) {

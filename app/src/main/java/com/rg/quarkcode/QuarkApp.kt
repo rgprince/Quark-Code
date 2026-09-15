@@ -11,7 +11,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +28,7 @@ import com.rg.quarkcode.backend.RuntimeFiles
 import com.rg.quarkcode.backend.RuntimeStore
 import com.rg.quarkcode.backend.ThemeMode
 import com.rg.quarkcode.backend.ThemeStore
+import com.rg.quarkcode.chat.ChatPrefs
 import com.rg.quarkcode.chat.ChatRoute
 import com.rg.quarkcode.chat.ChatScreen
 import com.rg.quarkcode.chat.UsageScreen
@@ -39,6 +42,7 @@ import com.rg.quarkcode.files.FilesScreen
 import com.rg.quarkcode.files.FilesViewModel
 import com.rg.quarkcode.files.SandboxScreen
 import com.rg.quarkcode.settings.SettingsScreen
+import com.rg.quarkcode.settings.WelcomeOverlay
 import com.rg.quarkcode.settings.SettingsViewModel
 import com.rg.quarkcode.theme.QuarkTheme
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +88,17 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
     val chatVm: ChatViewModel = viewModel()
     val settingsVm: SettingsViewModel = viewModel()
     val filesVm: FilesViewModel = viewModel()
+    val chatPrefs = remember(context.applicationContext) {
+        ChatPrefs(context.applicationContext)
+    }
+    var showWelcome by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val seen = runCatching {
+            withContext(Dispatchers.IO) { chatPrefs.prefs.first().welcomeSeen }
+        }.getOrNull() ?: true
+        showWelcome = !seen
+    }
 
     LaunchedEffect(Unit) {
         val appCtx = context.applicationContext
@@ -282,6 +297,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onNewMcpUrlChange = settingsVm::onNewMcpUrlChange,
                                 onAddMcp = settingsVm::addMcp,
                                 onToggleMcp = settingsVm::toggleMcp,
+                                onShowWelcome = { showWelcome = true },
                                 onOpen = { settingsVm.loadAll() }
                             )
                         }
@@ -381,6 +397,21 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                     }
                 }
             )
+            if (showWelcome) {
+                WelcomeOverlay(
+                    onClose = {
+                        showWelcome = false
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    chatPrefs.setWelcomeSeen(true)
+                                }
+                            }
+                        }
+                    },
+                    onOpenSettings = { backStack.add(SettingsRoute) }
+                )
+            }
         }
     }
 }

@@ -119,6 +119,7 @@ fun SettingsScreen(
     onNewMcpUrlChange: (String) -> Unit,
     onAddMcp: () -> Unit,
     onToggleMcp: (String, Boolean) -> Unit,
+    onShowWelcome: () -> Unit = {},
     onOpen: () -> Unit
 ) {
     LaunchedEffect(Unit) { onOpen() }
@@ -538,6 +539,25 @@ fun SettingsScreen(
                     item(key = "about") {
                         SettingsSection(title = "About Quark Code", icon = Icons.Filled.Info) {
                             AboutInfo()
+                        }
+                    }
+                    item(key = "welcome") {
+                        SettingsSection(title = "Help", icon = Icons.Filled.Info) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onShowWelcome),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Show welcome guide", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        text = "How to connect, Build/Plan, thinking effort",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                     item(key = "sandbox") {
