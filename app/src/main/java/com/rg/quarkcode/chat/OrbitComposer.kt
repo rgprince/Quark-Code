@@ -297,6 +297,18 @@ fun OrbitComposer(
                                 )
                             }
                         }
+                        Text(
+                            // Restored context readout, counts only (no %):
+                            // "12.4k / 200k". Top ring stays the single % source.
+                            text = meterLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Context $meterLabel used"
+                            }
+                        )
                         Spacer(modifier = Modifier.weight(1f))
                         if (queuedCount > 0) {
                             Badge(
@@ -354,6 +366,12 @@ fun OrbitComposer(
                     .height(3.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            // Keep context visible mid-turn: meter stays under the progress bar.
+            MeterBar(
+                fraction = meterFraction,
+                label = meterLabel,
+                modifier = Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp)
             )
         } else {
             MeterBar(
@@ -432,7 +450,7 @@ private fun MeterBar(
         progress = { fraction.coerceIn(0f, 1f) },
         modifier = modifier
             .fillMaxWidth()
-            .height(2.dp)
+            .height(3.dp)
             .semantics { contentDescription = "Context $label used" },
         color = color,
         trackColor = MaterialTheme.colorScheme.surfaceVariant
