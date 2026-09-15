@@ -240,7 +240,12 @@ fun SettingsScreen(
                                     .height(52.dp)
                             ) {
                                 if (state.testing) {
-                                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                                    CircularProgressIndicator(
+                                        modifier = Modifier
+                                            .padding(end = 8.dp)
+                                            .size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
                                 }
                                 Text("Test & save")
                             }
