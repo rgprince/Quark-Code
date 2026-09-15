@@ -11,8 +11,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.modelDataStore by preferencesDataStore(name = "quark_models")
 
-// Model selection + persistence ported from AndCode's AppPreferencesRepository
-// and SecureSettingsRepository. Key format everywhere: "providerId/modelId".
+// Model selection + persistence. Key format everywhere: "providerId/modelId".
 class ModelStore(private val context: Context) {
 
     private object Keys {
@@ -81,7 +80,7 @@ class ModelStore(private val context: Context) {
         return result
     }
 
-    // AndCode reconcile priority: stored-if-connected -> most-recent valid ->
+    // Reconcile priority: stored-if-connected -> most-recent valid ->
     // "opencode"-if-connected -> first provider. Model: stored -> recent ->
     // catalog default -> first active. Agent stays untouched (local labels).
     suspend fun reconcile(catalog: ProviderCatalog): Pair<String?, String?> {

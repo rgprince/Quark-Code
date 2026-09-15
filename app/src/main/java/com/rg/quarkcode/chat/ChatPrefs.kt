@@ -11,8 +11,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.chatPrefsDataStore by preferencesDataStore(name = "quark_chat_prefs")
 
-// Small chat prefs (AndCode Chat-settings parity): auto-expand reasoning,
-// detailed tool cards. Separate store so model reconcile stays untouched.
+// Small chat prefs. Separate store so model selection stays untouched.
 class ChatPrefs(private val context: Context) {
 
     private object Keys {

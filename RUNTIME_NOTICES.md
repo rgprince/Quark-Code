@@ -17,6 +17,11 @@ Quark code — build-time tools stay in CI, guest pieces download at runtime
 | Apache Commons Compress (archive extraction) | Apache-2.0 | https://commons.apache.org/proper/commons-compress/ |
 | Quark's downloader/supervisor/UI | GPL-3.0 (for now, see below) | this repo |
 
+## Inspiration credit
+
+Flow ideas studied from AndCode (MIT, https://github.com/yuga-hashimoto/and-code).
+All Quark code is rewritten — no AndCode source is copied.
+
 ## GPL-3 acceptance (temporary)
 
 Quark's own runtime-supervision code is accepted as GPL-3 **for now** because

@@ -74,7 +74,7 @@ data class Health(
     val version: String = ""
 )
 
-// Session / message / part shapes ported from AndCode's OpenCodeApiModels.
+// Session / message / part shapes for the Serve API.
 @Serializable
 data class SessionTime(
     @Serializable(with = LenientLong::class) val created: Long = 0L,
@@ -234,7 +234,7 @@ data class MessageWithParts(
 }
 
 // Server event envelope shapes (parsed by ServeEvents).
-// Fallback catalog shape: GET config/providers (subset of AndCode's).
+// Fallback catalog shape: GET config/providers.
 @Serializable
 data class ProvidersResponse(
     val providers: List<ProviderEntry> = emptyList(),
@@ -334,7 +334,7 @@ data class McpStatus(
     val error: String? = null
 )
 
-// Slash catalog shapes (AndCode IA: GET command / GET skill, POST session/{id}/command).
+// Slash catalog shapes (GET command / GET skill, POST session/{id}/command).
 @Serializable
 data class OpenCodeCommand(
     val name: String = "",
@@ -357,7 +357,7 @@ data class OpenCodeAgent(
     val mode: String? = null
 )
 
-// Provider auth shapes (AndCode IA: GET provider/auth, PUT auth/{id}, DELETE auth/{id}).
+// Provider auth shapes (GET provider/auth, PUT auth/{id}, DELETE auth/{id}).
 @Serializable
 data class ProviderAuthWhen(
     val key: String = "",
@@ -387,7 +387,7 @@ data class ProviderAuthMethod(
     val prompts: List<ProviderAuthPrompt> = emptyList()
 )
 
-// Review shapes (AndCode IA: GET session/{id}/diff, POST session/{id}/summarize,
+// Review shapes (GET session/{id}/diff, POST session/{id}/summarize,
 // PATCH session/{id} rename).
 @Serializable
 data class OpenCodeFileChange(

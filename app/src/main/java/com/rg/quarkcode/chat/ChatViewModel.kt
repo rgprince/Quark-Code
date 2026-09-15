@@ -190,7 +190,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         drainQueue()
     }
 
-    // ---- Catalog + selection (AndCode reconcile) ----
+    // ---- Catalog + selection ----
 
     private fun loadCatalog() {
         uiState = uiState.copy(catalogLoading = true, catalogError = null)
@@ -320,7 +320,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 selectedModelKey = id,
                 selectedProviderId = providerId,
                 modelSheet = false,
-                // A reasoning variant belongs to the old model — clear on switch (AndCode parity).
+                // A reasoning variant belongs to the old model — clear on switch.
                 selectedVariant = null,
                 variants = providers.firstOrNull { it.id == providerId }
                     ?.models?.get(modelId)?.variants?.keys?.toList() ?: emptyList(),
@@ -448,7 +448,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 ?.map { it.name }
                 ?.filter { it.isNotBlank() }
                 ?: return@launch
-            // Keep the build/plan picker first; fall back to full list (AndCode parity).
+            // Keep the build/plan picker first; fall back to full list.
             val modes = (agents.filter { it == "build" || it == "plan" }.ifEmpty { agents })
             uiState = uiState.copy(
                 modes = modes,
@@ -676,7 +676,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ---- Send (AndCode flow: async fire, stream merge, transcript completion) ----
+    // ---- Send (async fire, stream merge, transcript completion) ----
 
     fun send() {
         val text = uiState.input.trim()
@@ -685,7 +685,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(input = "")
             return
         }
-        // Offline: remember and auto-send on next attach (AndCode parity).
+        // Offline: remember and auto-send on next attach.
         if (!uiState.connected || api == null) {
             offlineQueue.add(text)
             uiState = uiState.copy(input = "")
@@ -926,7 +926,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ---- Review (AndCode IA: session diff + rename + summarize) ----
+    // ---- Review (session diff + rename + summarize) ----
 
     var reviewState by mutableStateOf(ReviewState())
         private set
@@ -1603,10 +1603,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             models.values.sortedByDescending { it.context }
     }
 
-    // AndCode parity: the REAL token count lives on the latest non-user
-    // MESSAGE (`info.tokens`), not on the session. This server's session
-    // tokens stay tiny/stale (screenshot: our 115 vs AndCode's real 11k),
-    // so read message-level first, session-level as fallback.
+    // The REAL token count lives on the latest non-user
+    // MESSAGE (`info.tokens`), not on the session. Session-level
+    // tokens stay tiny/stale, so read message-level first, session-level as fallback.
     private fun refreshCost(id: String) {
         viewModelScope.launch {
             val msgs = runCatching { api?.messages(id) }.getOrNull()

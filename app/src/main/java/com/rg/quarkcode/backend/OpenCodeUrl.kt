@@ -1,6 +1,6 @@
 package com.rg.quarkcode.backend
 
-// URL rules ported from AndCode's OpenCodeUrl: prepend http, trailing slash,
+// URL rules: prepend http, trailing slash,
 // http allowed only for loopback / LAN / Tailscale / ULA, https anywhere.
 object OpenCodeUrl {
 

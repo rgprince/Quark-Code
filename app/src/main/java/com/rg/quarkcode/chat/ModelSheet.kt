@@ -56,7 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-// QoL: shows only the chosen provider's models by default (AndCode showed all).
+// QoL: shows only the chosen provider's models by default.
 // Provider itself is chosen in Settings; picker offers an escape-hatch "Show all".
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

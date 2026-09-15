@@ -332,7 +332,7 @@ fun MessageList(
                 )
             }
         }
-        // Permissions + questions render after timeline, like AndCode.
+        // Permissions + questions render after timeline.
         items(messages.mapNotNull { it.permission }, key = { "perm:${it.id}" }) { request ->
             AnimatedVisibility(
                 visible = true,

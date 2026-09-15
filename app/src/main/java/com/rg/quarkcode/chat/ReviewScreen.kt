@@ -45,7 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rg.quarkcode.backend.OpenCodeFileChange
 
-// Review tab (AndCode IA: session diff + rename + summarize), Quark tokens.
+// Review tab (session diff + rename + summarize).
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScreen(

@@ -3,8 +3,7 @@ package com.rg.quarkcode.chat
 import com.rg.quarkcode.backend.OpenCodeCommand
 import com.rg.quarkcode.backend.OpenCodeSkill
 
-// Slash popup registry (AndCode IA, Quark-local app commands).
-// No @ mentions: AndCode never mapped them, server defines no @ endpoint.
+// Slash popup registry (Quark-local app commands).
 object SlashCommands {
 
     data class AppCommand(val name: String, val description: String)

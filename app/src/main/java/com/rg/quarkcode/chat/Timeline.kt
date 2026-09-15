@@ -1,7 +1,6 @@
 package com.rg.quarkcode.chat
 
-// Timeline grouping ported from AndCode's AssistantActivityGroup (study-only,
-// Quark styling kept). Collapses pending Reasoning+Tool parts into one Activity
+// Timeline grouping: collapses pending Reasoning+Tool parts into one Activity
 // entry so the transcript stays readable; blank reasoning never forms a group.
 sealed interface TimelineEntry {
     val id: String

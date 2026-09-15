@@ -23,8 +23,7 @@ import okhttp3.Credentials
 import okhttp3.Request
 import java.io.IOException
 
-// Typed server events, ported from AndCode's OpenCodeEventParser +
-// OpenCodeApiClient.events(). Envelope {payload} (global) vs direct.
+// Typed server events. Envelope {payload} (global) vs direct.
 sealed interface ServerEvent {
     data object Connected : ServerEvent
     data class MessageUpdated(val info: MessageInfo) : ServerEvent
@@ -209,7 +208,7 @@ object EventParser {
         }
 }
 
-// Event stream with global/event primary + /event fallback, ported from AndCode.
+// Event stream with global/event primary + /event fallback.
 class ServeEventStream(
     private val host: String,
     private val username: String,

@@ -267,8 +267,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // Provider detail dialog: API key add/remove (AndCode IA:
-    // PUT auth/{id} {type api,key}, DELETE auth/{id}).
+    // Provider detail dialog: API key add/remove.
     fun openProviderDialog(providerId: String) {
         val name = uiState.providers.firstOrNull { it.id == providerId }?.name ?: providerId
         val labels = authMethods[providerId]?.map { it.label.ifBlank { it.type } } ?: emptyList()

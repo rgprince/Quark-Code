@@ -12,7 +12,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-// OkHttp-direct Serve client, ported from AndCode's OpenCodeApiClient.
+// OkHttp-direct Serve client.
 // Every failure carries the server's own error text (first 3 lines, 240
 // chars) so a 400 never again reads as a bare number.
 class ServeApi(
