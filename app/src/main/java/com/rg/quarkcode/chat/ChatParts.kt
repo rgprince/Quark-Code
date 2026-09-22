@@ -56,7 +56,11 @@ data class ChatMessage(
     val parts: List<ChatPart> = emptyList(),
     val timestamp: Long = 0L,
     val isStreaming: Boolean = false,
-    val permission: PermissionRequest? = null
+    val permission: PermissionRequest? = null,
+    // Backend-reported turn time (info.time.completed - info.time.created).
+    // Null when the server omits completed (old servers, streaming rows).
+    // Used for the "Thought · Xms" line — no UI-local stopwatch needed.
+    val durationMs: Long? = null
 ) {
     val text: String
         get() = parts.filterIsInstance<ChatPart.Text>().joinToString("") { it.text }
@@ -211,7 +215,10 @@ fun MessageWithParts.toUiMessage(): ChatMessage? {
         id = info.id,
         isUser = info.role == "user",
         parts = allParts,
-        timestamp = info.time.created
+        timestamp = info.time.created,
+        durationMs = info.time.completed
+            ?.takeIf { it > info.time.created && info.time.created > 0L }
+            ?.let { it - info.time.created }
     )
 }
 

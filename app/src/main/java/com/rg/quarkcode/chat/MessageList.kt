@@ -139,14 +139,13 @@ fun MessageList(
                         modifier = Modifier.animateItem()
                     )
                     // Think-then-reply order: the thought line belongs right
-                    // after the prompt it answered. Shown when the live timer
-                    // recorded a phase OR when the transcript itself holds
-                    // reasoning — old chats never run the timer, so without
-                    // this fallback the line never appears for them.
-                    // thoughtReady hides the stale line once a newer prompt
-                    // exists, so a dummy "Thought" never stacks above the
-                    // live "thinking…" tail.
+                    // after the prompt it answered. Single-slot rule: the
+                    // completed line NEVER renders while the live tail (or
+                    // any busy work) is showing — busy shows thinking… only,
+                    // idle shows Thought only. Duration + text both come from
+                    // the backend transcript, no UI stopwatch.
                     if (index == lastUserIndex && showThoughts && thoughtReady &&
+                        !thinking && !busy &&
                         (thoughtMs != null || thoughtText.isNotBlank())
                     ) {
                         ThoughtDoneRow(
@@ -372,8 +371,8 @@ fun MessageList(
 }
 
 // Thought line: DONE history in neutral tone (not tertiary) so it never
-// twins the live "thinking…" tail below. Time sits beside the label
-// ("Thought · 16ms"); tap expands the reasoning text.
+// twins the live "thinking…" tail below. Time is backend-reported
+// (info.time.completed - created); null shows plain "Thought". Tap expands.
 @Composable
 private fun ThoughtDoneRow(
     ms: Long?,

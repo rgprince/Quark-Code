@@ -107,22 +107,15 @@ fun ChatScreen(
                     (part.status == ToolStatus.RUNNING || part.status == ToolStatus.PENDING)
             }
         }
-    // Think timer: how long the last thinking phase took, shown as an italic
-    // "Thought · 16ms" line above the reply. Purely UI-local, no backend cost.
-    var thinkStart by remember { mutableStateOf<Long?>(null) }
-    var lastThoughtMs by remember { mutableStateOf<Long?>(null) }
+    // Single thinking slot, backend-timed: while the turn is busy the live
+    // "thinking… Ns" tail is the ONLY thought UI; when idle the completed
+    // "Thought · Xms" line is the ONLY one. Duration comes from the server
+    // (info.time.completed - created on the reasoning message), so no
+    // UI-local per-phase stopwatch to juggle across thinking flaps.
     var thoughtExpanded by remember { mutableStateOf(false) }
     var thinkingSecs by remember { mutableStateOf(0) }
-    // Which prompt the recorded thought belongs to (user-bubble count when
-    // the phase completed, null until the first timed phase). A new prompt
-    // bumps the count, hiding the stale line so it never renders as a dummy
-    // "Thought" under the new bubble next to the live "thinking…" tail.
-    var thoughtUserCount by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(state.thinking) {
-        if (state.thinking) {
-            // New think phase: time it, but keep the previous thought line
-            // until this one completes — no flicker, no vanishes.
-            thinkStart = System.currentTimeMillis()
+    LaunchedEffect(busy) {
+        if (busy) {
             thoughtExpanded = false
             thinkingSecs = 0
             while (true) {
@@ -130,29 +123,26 @@ fun ChatScreen(
                 thinkingSecs++
             }
         } else {
-            // Every completed phase is recorded, even 16ms ones — the line
-            // is tiny, so fast thoughts deserve their timestamp too.
-            thinkStart?.let { started ->
-                lastThoughtMs = (System.currentTimeMillis() - started).coerceAtLeast(0L)
-                thoughtExpanded = false
-                thinkStart = null
-                thoughtUserCount = state.messages.count { it.isUser }
-            }
             thinkingSecs = 0
         }
     }
-    val lastThoughtText = remember(state.messages) {
-        state.messages.flatMap { it.parts }.filterIsInstance<ChatPart.Reasoning>()
-            .lastOrNull { it.text.isNotBlank() }?.text?.takeLast(600).orEmpty()
+    val lastReasoningMsg = remember(state.messages) {
+        state.messages.asReversed().firstOrNull { msg ->
+            msg.parts.any { it is ChatPart.Reasoning && it.text.isNotBlank() }
+        }
     }
+    val lastThoughtText = remember(lastReasoningMsg) {
+        lastReasoningMsg?.parts?.filterIsInstance<ChatPart.Reasoning>()
+            ?.lastOrNull { it.text.isNotBlank() }?.text?.takeLast(600).orEmpty()
+    }
+    // Backend time first; null (streaming row, old server) falls back to no
+    // duration — ThoughtDoneRow renders plain "Thought" in that case.
+    val backendThoughtMs = lastReasoningMsg?.durationMs
     val streamingIds = remember(state.messages) {
         state.messages.filter { it.isStreaming }.map { it.id }.toSet()
     }
-    // Stale-thought gate: null (no timed phase yet, e.g. old chats) counts
-    // as ready so the transcript fallback still shows; otherwise the thought
-    // only shows under the prompt it answered.
-    val userCount = state.messages.count { it.isUser }
-    val thoughtReady = thoughtUserCount == null || thoughtUserCount == userCount
+    // Done line only when the turn settled — never next to the live tail.
+    val thoughtReady = !busy && !state.thinking
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -200,7 +190,7 @@ fun ChatScreen(
                     comfortable = state.comfortable,
                     showTimestamps = state.showTimestamps,
                     thinkingSecs = thinkingSecs,
-                    thoughtMs = lastThoughtMs,
+                    thoughtMs = backendThoughtMs,
                     thoughtText = lastThoughtText,
                     thoughtReady = thoughtReady,
                     thoughtExpanded = thoughtExpanded,
