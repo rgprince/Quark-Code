@@ -153,7 +153,7 @@ object EventParser {
                     val errorObject = props["error"] as? JsonObject
                     ServerEvent.SessionError(
                         sessionId = (props["sessionID"] as? JsonPrimitive)?.content,
-                        message = describeError(props["error"]),
+                        message = summarizeFault(props["error"]),
                         name = (errorObject?.get("name") as? JsonPrimitive)?.content
                     )
                 }
@@ -162,19 +162,20 @@ object EventParser {
         }.getOrElse { ServerEvent.Unknown(type) }
     }
 
-    private fun describeError(element: kotlinx.serialization.json.JsonElement?): String? {
-        if (element == null) return null
-        (element as? JsonPrimitive)?.let { return it.content }
-        val error = element as? JsonObject ?: return element.toString()
-        val message = ((error["data"] as? JsonObject)?.get("message") as? JsonPrimitive)
-            ?.content?.takeIf { it.isNotBlank() }
-        val name = (error["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
-        return when {
-            message != null && name != null -> "$name: $message"
-            message != null -> message
-            name != null -> name
-            else -> error.toString()
-        }
+    // Quark-original: turn a session.error payload into one human line.
+    // Shapes seen: plain string, {name, data:{message}}, or full object fallback.
+    private fun summarizeFault(node: kotlinx.serialization.json.JsonElement?): String? {
+        if (node == null) return null
+        val direct = node as? JsonPrimitive
+        if (direct != null) return direct.content
+        val body = node as? JsonObject ?: return node.toString()
+        val inner = body["data"] as? JsonObject
+        val detail = (inner?.get("message") as? JsonPrimitive)?.content?.trim()?.takeIf { it.isNotEmpty() }
+        val tag = (body["name"] as? JsonPrimitive)?.content?.trim()?.takeIf { it.isNotEmpty() }
+        if (!detail.isNullOrEmpty() && !tag.isNullOrEmpty()) return tag + ": " + detail
+        if (!detail.isNullOrEmpty()) return detail
+        if (!tag.isNullOrEmpty()) return tag
+        return body.toString()
     }
 
     private fun parseQuestion(element: kotlinx.serialization.json.JsonElement): QuestionPrompt? =
