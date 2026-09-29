@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -616,7 +617,8 @@ private fun AboutInfo(modifier: Modifier = Modifier) {
             "License: GPL-3.0 (sole author, no outside commits)\n" +
             "On-device backend: opencode ${GuestOpencode.PINNED_TAG} (MIT, serve, 127.0.0.1:${LocalBackend.PORT})\n" +
             "Debian: mixed, proot GPL-2.0, Commons-Compress Apache-2.0\n" +
-            "Sources: github.com/anomalyco/opencode · termux/proot-distro"
+            "Sources: github.com/anomalyco/opencode · termux/proot-distro\n" +
+            "Bugs/stars: github.com/rgprince/Quark-Code"
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "Quark Code $versionLine",
@@ -625,8 +627,8 @@ private fun AboutInfo(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Native Android client for opencode. On-device mode runs the " +
-                "official opencode ${GuestOpencode.PINNED_TAG} server (headless " +
+            text = "Personal alpha to run opencode sandboxed and locally on your phone. " +
+                "On-device mode runs the official opencode ${GuestOpencode.PINNED_TAG} server (headless " +
                 "`serve` on 127.0.0.1:${LocalBackend.PORT}) inside a Debian guest " +
                 "(proot, no root needed). Remote mode talks to the same API " +
                 "over LAN/Tailscale.",
@@ -642,6 +644,19 @@ private fun AboutInfo(modifier: Modifier = Modifier) {
         AboutFact(label = "Sources", value = "anomalyco/opencode · proot-distro")
         Spacer(modifier = Modifier.height(8.dp))
         Text(
+            text = "Keys & cost",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "You bring your own provider keys (Settings → Providers). Quark only shows tokens and cost. " +
+                "You can try opencode free models first, but don't share sensitive data — free models can be used to train AI.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
             text = "License",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface
@@ -651,7 +666,7 @@ private fun AboutInfo(modifier: Modifier = Modifier) {
             text = "Quark Code is GPL-3.0 (sole author, no outside commits). " +
                 "On-device pieces run as separate processes: opencode MIT, " +
                 "Debian mixed, proot GPL-2.0, Commons-Compress Apache-2.0, " +
-                "Bun MIT. Flow ideas studied from AndCode (MIT), all code rewritten.",
+                "Bun MIT.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -660,6 +675,52 @@ private fun AboutInfo(modifier: Modifier = Modifier) {
         AboutFact(label = "opencode", value = "MIT")
         AboutFact(label = "proot", value = "GPL-2.0")
         AboutFact(label = "Compress", value = "Apache-2.0")
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Device note",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "This build averages ~700 MB–1 GB RAM. Under 4 GB RAM is not " +
+                "recommended yet — RAM gets further optimized in future builds, " +
+                "and some bugs remain.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Tools tip",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "If an extra package direct download didn't work, just ask the agent to download it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Bugs & stars",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Hit a bug? Please report it — and star the repo so others find it:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        val uri = LocalUriHandler.current
+        Text(
+            text = QUARK_REPO_URL,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { uri.openUri(QUARK_REPO_URL) }
+        )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedButton(
             onClick = { clipboard.setText(AnnotatedString(infoText)) },
