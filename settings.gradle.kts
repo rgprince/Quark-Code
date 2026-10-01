@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "Quark"
+rootProject.name = "Quark Code"
 include(":app")

@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.NoteAdd
@@ -269,6 +270,7 @@ private fun BrowserBody(
         }
     }
     var fabMenu by remember { mutableStateOf(false) }
+    var showSandboxNote by remember { mutableStateOf(true) }
     val selecting = state.selection.isNotEmpty()
     val writable = state.root == FilesGate.Root.WORKSPACE
     // SAF launchers: no storage permission needed; the user picks exactly
@@ -509,6 +511,43 @@ private fun BrowserBody(
                         onClick = { onSwitchRoot(root) },
                         label = { Text(FilesGate.label(root)) }
                     )
+                }
+            }
+            if (showSandboxNote && state.root == FilesGate.Root.WORKSPACE && !state.searching) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "This workshop is sandboxed — the agent can only see " +
+                                "these Workspace files. It can't touch your phone until YOU " +
+                                "add something (Import from phone via + or ⋮), and you can " +
+                                "take anything out anytime via Share / Save.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { showSandboxNote = false }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Dismiss")
+                        }
+                    }
                 }
             }
             if (!state.searching) {

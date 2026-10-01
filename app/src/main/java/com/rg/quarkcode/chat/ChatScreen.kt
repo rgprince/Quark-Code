@@ -228,6 +228,7 @@ fun ChatScreen(
                     emptyList()
                 },
                 atSuggestions = state.atSuggestions,
+                atNoResult = state.atNoResult,
                 onInputChange = onInputChange,
                 onSend = onSend,
                 onAbort = onAbort,

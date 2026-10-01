@@ -46,7 +46,10 @@ data class AtFile(
 @Serializable
 data class RecentSession(
     val id: String,
-    val title: String
+    val title: String,
+    // Server timestamp (updated ?: created) for drawer day-grouping
+    // (Today / Yesterday / Previous 7/30 days). Null = legacy cache.
+    val updated: Long? = null
 )
 
 enum class UsagePeriod(val label: String) {
@@ -124,6 +127,9 @@ data class ChatUiState(
     val queuedCount: Int = 0,
     val hiddenModels: List<CatalogModel> = emptyList(),
     val atSuggestions: List<AtFile> = emptyList(),
+    // True when an @ search ran but found nothing (or failed): the composer
+    // shows a hint row instead of silent nothing.
+    val atNoResult: Boolean = false,
     val catalog: List<CatalogModel> = listOf(CatalogModel("auto", "Auto (server default)")),
     val modelRecents: List<String> = emptyList(),
     val catalogLoading: Boolean = false,

@@ -1,1 +1,5 @@
-File manager for the agent workspace (browse /workspace + Debian system, SAF import/export, workspace-only share), Sandbox status screen, F-Droid flavor + store metadata.
+First public release (v0.14.0):
+- Workspace file manager + Sandbox screen
+- Usage stats with per-model cost
+- On-device Debian backend + LAN mode
+- F-Droid flavor, ~5 MB APK

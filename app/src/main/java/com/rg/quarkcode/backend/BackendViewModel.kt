@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 enum class StageState { PENDING, ACTIVE, DONE, ERROR }
@@ -41,6 +43,10 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
     private var debianJob: Job? = null
     private var opencodeJob: Job? = null
     private val toolJobs = mutableMapOf<String, Job>()
+    // One apt writer per guest: tapping Install on fzf then gh used to run
+    // two `apt-get install` proot processes at once and both died on the
+    // dpkg frontend lock (pid-held). Second tool now waits its turn.
+    private val aptMutex = Mutex()
 
     var debianStages by mutableStateOf<List<InstallStage>>(emptyList())
         private set
@@ -302,11 +308,26 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         tools = tools.map { if (it.def.id == id) it.copy(working = true) else it }
         toolJobs[id] = viewModelScope.launch {
             try {
-                val ok = GuestTools.install(
-                    run = { args -> LocalBackend.runGuest(app, args, 600_000L) },
-                    def = row.def,
-                    onLog = { line -> LocalBackend.appendLog("[${row.def.id}] $line") }
-                )
+                // Queued behind a running install: say so, or the log goes
+                // quiet after "$ apt-get install" and reads as a silent stall.
+                if (aptMutex.isLocked) {
+                    LocalBackend.appendLog("[${row.def.id}] waiting for the running install to finish…")
+                }
+                val ok = aptMutex.withLock {
+                    GuestTools.install(
+                        // dpkg bookkeeping gets a short budget: with the 5s
+                        // wait slices a wedged configure now fails fast
+                        // instead of eating the whole install timeout.
+                        run = { args ->
+                            LocalBackend.runGuest(
+                                app, args,
+                                if (args.firstOrNull() == "dpkg") 90_000L else 600_000L
+                            )
+                        },
+                        def = row.def,
+                        onLog = { line -> LocalBackend.appendLog("[${row.def.id}] $line") }
+                    )
+                }
                 if (!ok) error = "${row.def.label} install failed — see server log"
             } catch (e: Exception) {
                 if (e !is kotlinx.coroutines.CancellationException) {
@@ -324,11 +345,21 @@ class BackendViewModel(application: Application) : AndroidViewModel(application)
         tools = tools.map { if (it.def.id == id) it.copy(working = true) else it }
         toolJobs[id] = viewModelScope.launch {
             try {
-                GuestTools.remove(
-                    run = { args -> LocalBackend.runGuest(app, args, 300_000L) },
-                    def = row.def,
-                    onLog = { line -> LocalBackend.appendLog("[${row.def.id}] $line") }
-                )
+                if (aptMutex.isLocked) {
+                    LocalBackend.appendLog("[${row.def.id}] waiting for the running install to finish…")
+                }
+                aptMutex.withLock {
+                    GuestTools.remove(
+                        run = { args ->
+                            LocalBackend.runGuest(
+                                app, args,
+                                if (args.firstOrNull() == "dpkg") 90_000L else 300_000L
+                            )
+                        },
+                        def = row.def,
+                        onLog = { line -> LocalBackend.appendLog("[${row.def.id}] $line") }
+                    )
+                }
             } catch (e: Exception) {
                 if (e !is kotlinx.coroutines.CancellationException) {
                     error = e.message?.take(200) ?: "${row.def.label} removal failed"

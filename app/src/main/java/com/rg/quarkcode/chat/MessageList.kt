@@ -1,6 +1,7 @@
 package com.rg.quarkcode.chat
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -99,9 +100,12 @@ fun MessageList(
         sheetGroupId?.let { findActivityParts(messages, it) } ?: emptyList()
     }
     val listState = rememberLazyListState()
-    // Smooth follow: stick to bottom on new content only when already near the end.
+    // Smooth follow: stick to bottom on new content only when already near
+    // the end — and never while the user is dragging (repeated
+    // animateScrollToItem cancels their fling and reads as scroll jank).
     LaunchedEffect(timeline.size, thinking, autoScroll) {
         if (!autoScroll) return@LaunchedEffect
+        if (listState.isScrollInProgress) return@LaunchedEffect
         val last = listState.layoutInfo.totalItemsCount - 1
         if (last < 0) return@LaunchedEffect
         val visible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -118,6 +122,13 @@ fun MessageList(
     }
     val lastUserIndex = remember(timeline) {
         timeline.indexOfLast { it is TimelineEntry.UserMessage }
+    }
+    // A Todo card in the CURRENT turn is already liveness: the cooking
+    // bubble / thinking tail underneath it reads as a doubled spinner.
+    val hasCurrentTodo = remember(timeline, lastUserIndex) {
+        timeline
+            .drop(if (lastUserIndex < 0) 0 else lastUserIndex + 1)
+            .any { it is TimelineEntry.Todo }
     }
     LazyColumn(
         state = listState,
@@ -316,14 +327,19 @@ fun MessageList(
         // it is replaced the moment real content streams in). Otherwise the
         // thinking tail shows, derived from busy so a long pre-tool phase
         // with no activity row yet never looks dead. Both are suppressed
-        // while a running activity row already shows progress.
+        // while a running activity row already shows progress — and while a
+        // Todo card of this turn is visible (its check rows are liveness).
         val lastIsUser = messages.lastOrNull()?.isUser == true
-        val showCooking = awaitingReply && lastIsUser && playfulStatus
+        val showCooking = awaitingReply && lastIsUser && playfulStatus && !hasCurrentTodo
+        // Once reply text is visibly streaming, the RichText caret is the
+        // liveness signal — keeping the tail below it reads as a flash
+        // after the message. Tail stays for pre-reply / inter-tool gaps.
+        val hasStreamingText = messages.any { it.isStreaming && it.text.isNotBlank() }
         if (showCooking) {
             item(key = "cooking-bubble") {
                 CookingBubble(modifier = Modifier.animateItem())
             }
-        } else if ((thinking || busy) && !hasRunningActivity) {
+        } else if ((thinking || busy) && !hasRunningActivity && !hasStreamingText && !hasCurrentTodo) {
             item(key = "thinking-tail") {
                 ThinkingTail(
                     seconds = thinkingSecs,
@@ -331,20 +347,16 @@ fun MessageList(
                 )
             }
         }
-        // Permissions + questions render after timeline.
+        // Permissions + questions render after timeline (no enter animation:
+        // an always-true AnimatedVisibility re-flashed on every insert).
         items(messages.mapNotNull { it.permission }, key = { "perm:${it.id}" }) { request ->
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn() + expandVertically(),
+            PermissionCard(
+                request = request,
+                onAllow = { onAllow(request.id) },
+                onDeny = { onDeny(request.id) },
+                onRememberChange = { remember -> onRememberChange(request.id, remember) },
                 modifier = Modifier.animateItem()
-            ) {
-                PermissionCard(
-                    request = request,
-                    onAllow = { onAllow(request.id) },
-                    onDeny = { onDeny(request.id) },
-                    onRememberChange = { remember -> onRememberChange(request.id, remember) }
-                )
-            }
+            )
         }
         items(
             messages.flatMap { m -> m.parts.filterIsInstance<ChatPart.QuestionOption>().map { m.id to it } },
@@ -455,7 +467,9 @@ private fun CookingBubble(
             ),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 1.dp,
-            modifier = Modifier.semantics { contentDescription = "Assistant is ${words[index]}" }
+            modifier = Modifier
+                .animateContentSize()
+                .semantics { contentDescription = "Assistant is ${words[index]}" }
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),

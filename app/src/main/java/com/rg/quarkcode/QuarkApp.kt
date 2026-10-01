@@ -1,11 +1,20 @@
 package com.rg.quarkcode
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -16,7 +25,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavEntry
@@ -81,8 +95,26 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
     // Chat first, always: the saved backend auto-attaches below, and the
     // backend URL stays editable anytime in Settings → Connection.
     val backStack = remember { mutableStateListOf<Any>(ChatRoute("local")) }
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    // Push-aside drawer (Qwen-style): no dark scrim — the chat page follows
+    // the finger between closed (0) and open (320.dp), stops wherever
+    // released mid-drag, and snaps shut only past 40% travel or a left fling.
+    // Single writer (setDrawer) drives both the boolean and the pixels, so
+    // gestures and buttons can never fight mid-animation.
+    var drawerOpen by remember { mutableStateOf(false) }
+    val drawerWidth = 320.dp
+    val density = LocalDensity.current
+    val openPx = with(density) { drawerWidth.toPx() }
     val scope = rememberCoroutineScope()
+    val dragOffset = remember { Animatable(0f) }
+    fun setDrawer(open: Boolean) {
+        drawerOpen = open
+        scope.launch {
+            dragOffset.animateTo(
+                if (open) openPx else 0f,
+                spring(stiffness = Spring.StiffnessMediumLow)
+            )
+        }
+    }
     val context = LocalContext.current
     val connectVm: ConnectViewModel = viewModel()
     val chatVm: ChatViewModel = viewModel()
@@ -135,12 +167,12 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
         }
     }
 
-    fun openDrawer() {
-        scope.launch { drawerState.open() }
+    fun toggleDrawer() {
+        setDrawer(!drawerOpen)
     }
 
     fun closeDrawer() {
-        scope.launch { drawerState.close() }
+        setDrawer(false)
     }
 
     fun goChat() {
@@ -150,14 +182,23 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
         }
     }
 
-    ModalNavigationDrawer(
-        modifier = modifier,
-        drawerState = drawerState,
-        drawerContent = {
-            QuarkDrawer(
-                recents = chatVm.uiState.recents,
-                recentsError = chatVm.uiState.recentsError,
-                hasSession = chatVm.hasSession,
+    // Theme-colored root: with edge-to-edge the window behind is black, so
+    // any revealed strip (status/nav insets, rounded cutouts) must match the
+    // app surface instead of flashing black.
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        // System back closes the push drawer first, like the modal one did.
+        // Offset-based (not just settled) so a half-dragged panel still wins.
+        BackHandler(enabled = drawerOpen || dragOffset.value > 1f) { closeDrawer() }
+        // Drawer sits BEHIND the chat page; the page slides over it.
+        QuarkDrawer(
+            recents = chatVm.uiState.recents,
+            recentsError = chatVm.uiState.recentsError,
+            hasSession = chatVm.hasSession,
+            selectedId = chatVm.openSessionId,
                 onNewChat = {
                     closeDrawer()
                     chatVm.newSession()
@@ -182,9 +223,26 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                 },
                 onRefreshRecents = chatVm::refreshRecents
             )
-        }
-    ) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        PushPanel(
+            offsetPx = dragOffset.value,
+            openPx = openPx,
+            onDrag = { delta ->
+                scope.launch {
+                    dragOffset.snapTo((dragOffset.value + delta).coerceIn(0f, openPx))
+                }
+            },
+            onDragStopped = { velocity ->
+                setDrawer(
+                    when {
+                        velocity < -800f -> false
+                        velocity > 800f -> true
+                        else -> dragOffset.value > openPx * 0.4f
+                    }
+                )
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Surface(modifier = Modifier.fillMaxSize()) {
             NavDisplay(
                 backStack = backStack,
                 onBack = { backStack.removeLastOrNull() },
@@ -230,8 +288,18 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onAnswer = chatVm::answerQuestion,
                                 onModeChange = chatVm::onModeChange,
                                 onVariantChange = chatVm::onVariantChange,
+                                // Single-tap slash: app commands run at once, /agent
+                                // opens the drawer (it replaced Spaces), backend
+                                // commands fill the box so args can be typed.
                                 onSlashSelect = { suggestion ->
-                                    chatVm.onInputChange(suggestion.name + " ")
+                                    if (suggestion.name == "/agent") {
+                                        toggleDrawer()
+                                        chatVm.onInputChange("")
+                                    } else if (chatVm.handleSlashInput(suggestion.name)) {
+                                        chatVm.onInputChange("")
+                                    } else {
+                                        chatVm.onInputChange(suggestion.name + " ")
+                                    }
                                 },
                                 onAtSelect = { file ->
                                     chatVm.insertAtFile(file.path)
@@ -239,7 +307,7 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                                 onVoiceResult = chatVm::appendVoiceResult,
                                 onDismissTodos = chatVm::dismissTodos,
                                 onOpenSettings = { backStack.add(SettingsRoute) },
-                                onMenu = { openDrawer() }
+                                onMenu = { toggleDrawer() }
                             )
                         }
                         is SettingsRoute -> NavEntry(key) {
@@ -412,6 +480,55 @@ private fun QuarkNavHost(modifier: Modifier = Modifier) {
                     onOpenSettings = { backStack.add(SettingsRoute) }
                 )
             }
+            }
         }
+    }
+}
+
+// Push-aside panel: the page above the drawer, following the finger via the
+// caller's drag callbacks — stops wherever released mid-drag, snaps per the
+// 40%-travel / fling rule. Only the drawer-facing (start) edge rounds, so
+// the screen-side edges never cut black wedges out of the window.
+@Composable
+private fun PushPanel(
+    offsetPx: Float,
+    openPx: Float,
+    onDrag: (Float) -> Unit,
+    onDragStopped: suspend kotlinx.coroutines.CoroutineScope.(Float) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val progress = (offsetPx / openPx).coerceIn(0f, 1f)
+    val corner = 20.dp * progress
+    Box(
+        modifier = modifier
+            .offset { IntOffset(offsetPx.toInt(), 0) }
+            .then(
+                if (progress > 0.01f) {
+                    Modifier
+                        .shadow(
+                            16.dp * progress,
+                            RoundedCornerShape(
+                                topStart = corner,
+                                bottomStart = corner
+                            )
+                        )
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = corner,
+                                bottomStart = corner
+                            )
+                        )
+                } else {
+                    Modifier
+                }
+            )
+            .draggable(
+                state = rememberDraggableState(onDelta = onDrag),
+                orientation = Orientation.Horizontal,
+                onDragStopped = onDragStopped
+            )
+    ) {
+        content()
     }
 }

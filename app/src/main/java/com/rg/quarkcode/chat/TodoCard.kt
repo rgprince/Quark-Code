@@ -45,7 +45,9 @@ fun TodoCard(
     onDismiss: (() -> Unit)? = null
 ) {
     if (todos.isEmpty()) return
-    var collapsed by remember { mutableStateOf(false) }
+    // Keyed by content identity: unkeyed remember{} reset the collapse state
+    // on every streamed todo delta (key churn reads as flicker).
+    var collapsed by remember(todos.map { it.id }) { mutableStateOf(false) }
     val done = todos.count { it.done }
     Card(
         modifier = modifier

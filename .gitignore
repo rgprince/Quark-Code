@@ -6,3 +6,10 @@ local.properties
 .DS_Store
 Screenshot_*.png
 release-apk/
+# v1: internal docs stay local, not part of public release
+PROJECT_OVERVIEW.md
+DEPENDENCY_TREE.md
+HANDOFF.md
+UI_ANIMATION_AUDIT.md
+OPEN_BUGS.md
+file_*.png

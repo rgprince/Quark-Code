@@ -27,7 +27,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Visibility
@@ -207,10 +207,10 @@ fun QuarkToolCard(
     val isSubagent = part.name.equals("task", ignoreCase = true)
     val displayName = if (isSubagent) "subagent" else part.name
     val summary = remember(part) { prettyToolSummary(part) }
-    var expanded by remember {
+    val running = part.status == ToolStatus.RUNNING || part.status == ToolStatus.PENDING
+    var expanded by remember(part.id) {
         mutableStateOf(
-            part.status == ToolStatus.RUNNING ||
-                part.status == ToolStatus.PENDING ||
+            running ||
                 part.status == ToolStatus.ERROR ||
                 detailed
         )
@@ -235,15 +235,30 @@ fun QuarkToolCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(statusColor)
-                        .semantics {
-                            contentDescription = "Tool ${part.status.name.lowercase()}"
-                        }
-                )
+                // One liveness signal only: a spinner while running, the
+                // status dot when settled. Dot + icon + spinner together
+                // read as clashing glyphs (the todowrite "flower" report).
+                if (running) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .semantics {
+                                contentDescription = "Tool ${part.status.name.lowercase()}"
+                            },
+                        strokeWidth = 2.dp,
+                        color = statusColor
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                            .semantics {
+                                contentDescription = "Tool ${part.status.name.lowercase()}"
+                            }
+                    )
+                }
                 Icon(
                     imageVector = part.name.toolCategoryIcon(),
                     contentDescription = null,
@@ -362,7 +377,7 @@ private fun String.toolCategoryIcon(): ImageVector = when (toToolCategory()) {
     ToolCategory.COMMAND -> Icons.Filled.Terminal
     ToolCategory.READ -> Icons.Filled.Visibility
     ToolCategory.EDIT -> Icons.Filled.Description
-    ToolCategory.SUBAGENT -> Icons.Filled.Hub
+    ToolCategory.SUBAGENT -> Icons.Filled.List
     ToolCategory.OTHER -> Icons.Filled.Build
 }
 

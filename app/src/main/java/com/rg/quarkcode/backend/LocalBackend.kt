@@ -100,6 +100,11 @@ object LocalBackend {
             "LC_ALL=C.UTF-8",
             "TMPDIR=/tmp",
             "TZ=UTC",
+            // Automation, not a terminal: apt/dpkg must never block on a
+            // debconf prompt (fresh trixie configures tzdata-style packages
+            // on first install). stdin is also closed in runGuest, so a
+            // missed prompt reads EOF instead of hanging to the timeout.
+            "DEBIAN_FRONTEND=noninteractive",
             "XDG_RUNTIME_DIR=/tmp",
             // Belt-and-braces for the desktop `opencode web` habit: even in
             // `serve` mode a spawned helper must open nothing and exit 0
@@ -256,6 +261,10 @@ object LocalBackend {
         env.clear()
         env.putAll(hostEnv(suite))
         val proc = pb.start()
+        // No terminal here: close stdin at once so a missed interactive
+        // prompt reads EOF (default answer) instead of blocking until the
+        // timeout and surfacing as a silent exit-124 with an empty log.
+        runCatching { proc.outputStream.close() }
         val out = StringBuilder()
         val reader = thread(isDaemon = true, name = "guest-cmd") {
             try {
@@ -265,13 +274,22 @@ object LocalBackend {
             } catch (_: Exception) {
             }
         }
-        val finished = try {
-            proc.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-        } catch (_: Exception) {
-            false
+        // Cancellable in slices: one long blocking waitFor() ignores coroutine
+        // cancellation (and the caller's withTimeoutOrNull), parking the whole
+        // install on a wedged dpkg. Poll in 5s slices so timeouts — and the
+        // 120s heal cap — actually take effect instead of silently walling.
+        var finished = false
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!finished && System.currentTimeMillis() < deadline) {
+            finished = try {
+                proc.waitFor(5_000L, TimeUnit.MILLISECONDS)
+            } catch (_: Exception) {
+                false
+            }
         }
         if (!finished) {
             runCatching { proc.destroyForcibly() }
+            runCatching { proc.waitFor(3, TimeUnit.SECONDS) }
         }
         reader.join(3000L)
         GuestCmdResult(

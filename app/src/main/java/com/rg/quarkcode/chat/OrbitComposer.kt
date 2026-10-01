@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
@@ -30,20 +31,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,6 +82,7 @@ fun OrbitComposer(
     selectedVariant: String?,
     slashSuggestions: List<SlashSuggestion>,
     atSuggestions: List<AtFile>,
+    atNoResult: Boolean = false,
     textScale: Float = 1f,
     modifier: Modifier = Modifier,
     onInputChange: (String) -> Unit,
@@ -101,7 +102,7 @@ fun OrbitComposer(
         modifier = modifier
             .fillMaxWidth()
             .imePadding()
-            .padding(vertical = 4.dp)
+            .padding(top = 4.dp, bottom = 2.dp)
     ) {
         if (input.startsWith("/") && slashSuggestions.isNotEmpty()) {
             Card(
@@ -118,6 +119,14 @@ fun OrbitComposer(
                     modifier = Modifier.heightIn(max = 280.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
+                    item(key = "slash-header") {
+                        Text(
+                            text = "Commands",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
                     items(
                         slashSuggestions,
                         key = { it.name + "|" + it.isApp + "|" + it.isSkill }
@@ -131,6 +140,12 @@ fun OrbitComposer(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Icon(
+                                imageVector = Icons.Filled.Terminal,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
                             Text(
                                 text = suggestion.name,
                                 style = MaterialTheme.typography.labelLarge,
@@ -150,7 +165,7 @@ fun OrbitComposer(
                 }
             }
         }
-        if (atSuggestions.isNotEmpty()) {
+        if (atSuggestions.isNotEmpty() || atNoResult) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -161,10 +176,29 @@ fun OrbitComposer(
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
+                if (atSuggestions.isEmpty()) {
+                    // Search ran but found nothing (empty workspace or failed
+                    // lookup — the failure is in the server log): never leave
+                    // a bare @ answering with silence.
+                    Text(
+                        text = "No files match — keep typing, or import files in Workspace",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
+                } else {
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 240.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
+                    item(key = "at-header") {
+                        Text(
+                            text = "Files",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
                     items(atSuggestions, key = { it.path }) { file ->
                         Row(
                             modifier = Modifier
@@ -175,6 +209,12 @@ fun OrbitComposer(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Icon(
+                                imageVector = Icons.Filled.Description,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
                             Text(
                                 text = file.name,
                                 style = MaterialTheme.typography.labelLarge,
@@ -191,6 +231,7 @@ fun OrbitComposer(
                             )
                         }
                     }
+                }
                 }
             }
         }
@@ -325,60 +366,58 @@ fun OrbitComposer(
                                 )
                             }
                         }
-                        if (input.isBlank() && !sending) {
-                            OutlinedIconButton(
-                                onClick = onMicClick,
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(
-                                    Icons.Filled.Mic,
-                                    contentDescription = "Voice input",
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                        // Single Qwen-style action slot: mic -> white arrow-up
+                        // -> stop morph in place, so the row never jumps.
+                        val canSend = input.isNotBlank()
+                        val slotDesc = when {
+                            sending -> "Stop generating"
+                            canSend -> "Send message"
+                            else -> "Voice input"
                         }
-                        FilledIconButton(
-                            onClick = { if (sending) onAbort() else onSend() },
-                            enabled = sending || input.isNotBlank(),
+                        Surface(
+                            shape = CircleShape,
+                            color = if (sending || canSend) Color.White
+                            else MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier
                                 .size(48.dp)
-                                .semantics {
-                                    contentDescription = if (sending) "Stop generating" else "Send message"
-                                }
-                        ) {
-                            AnimatedContent(targetState = sending, label = "send-stop") { isSending ->
-                                Icon(
-                                    imageVector = if (isSending) Icons.Filled.Stop else Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
+                                .clip(CircleShape)
+                                .clickable(
+                                    onClick = {
+                                        when {
+                                            sending -> onAbort()
+                                            canSend -> onSend()
+                                            else -> onMicClick()
+                                        }
+                                    },
+                                    role = Role.Button
                                 )
+                                .semantics { contentDescription = slotDesc }
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AnimatedContent(
+                                    targetState = if (sending) 2 else if (canSend) 1 else 0,
+                                    label = "action-morph"
+                                ) { state ->
+                                    Icon(
+                                        imageVector = when (state) {
+                                            2 -> Icons.Filled.Stop
+                                            1 -> Icons.Filled.ArrowUpward
+                                            else -> Icons.Filled.Mic
+                                        },
+                                        contentDescription = null,
+                                        tint = if (sending || canSend) Color.Black
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        if (sending) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp, start = 4.dp, end = 4.dp)
-                    .height(3.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-            // Keep context visible mid-turn: meter stays under the progress bar.
-            MeterBar(
-                fraction = meterFraction,
-                label = meterLabel,
-                modifier = Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp)
-            )
-        } else {
-            MeterBar(
-                fraction = meterFraction,
-                label = meterLabel,
-                modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp)
-            )
         }
     }
 }
@@ -435,24 +474,5 @@ private fun ModeStrip(
 // Thinking effort lives in the model sheet now: the composer keeps only the
 // model pill (tap = model menu). The old "auto" VariantPill duplicated the
 // sheet control and crowded the action row, so it was removed.
-@Composable
-private fun MeterBar(
-    fraction: Float,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    val color = when {
-        fraction >= 0.9f -> MaterialTheme.colorScheme.error
-        fraction >= 0.7f -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.primary
-    }
-    LinearProgressIndicator(
-        progress = { fraction.coerceIn(0f, 1f) },
-        modifier = modifier
-            .fillMaxWidth()
-            .height(3.dp)
-            .semantics { contentDescription = "Context $label used" },
-        color = color,
-        trackColor = MaterialTheme.colorScheme.surfaceVariant
-    )
-}
+// NOTE: meter bars removed (both the sending progress + MeterBar): the stop
+// button already signals busy and "35.1k / 1.0M" + top ring carry context.

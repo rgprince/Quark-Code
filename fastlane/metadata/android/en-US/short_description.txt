@@ -1,1 +1,1 @@
-Native Android client for the opencode AI coding agent. Runs on-device in a sandbox, or over LAN.
+On-device opencode AI coder for Android

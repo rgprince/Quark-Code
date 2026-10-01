@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rg.quarkcode.backend.EventParser
+import com.rg.quarkcode.backend.LocalBackend
 import com.rg.quarkcode.backend.CacheStore
 import com.rg.quarkcode.backend.CachedSnapshot
 import com.rg.quarkcode.backend.ModelRef
@@ -28,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -69,15 +71,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var chatPrefs: ChatPrefs? = null
     private var lastSeenIds = mutableSetOf<String>()
     private val streamedParts = mutableMapOf<String, ChatPart>()
+    // Message ids with live SSE content not yet in the transcript.
+    // mergeReloadedMessages retains by MESSAGE id, so we must track these
+    // separately — streamedParts is keyed by PART id and can never match.
+    private val streamedMessageIds = mutableSetOf<String>()
     private val messageQueue = mutableListOf<String>()
     private val offlineQueue = mutableListOf<String>()
     private var atJob: Job? = null
+    private var lastAtError: String? = null
     private var usageJob: Job? = null
 
     var usageState by mutableStateOf(UsageState())
         private set
 
     val hasSession: Boolean get() = sessionId != null
+    // Open session id for the drawer selected-pill highlight.
+    val openSessionId: String? get() = sessionId
 
     fun attach(host: String, username: String, password: String) {
         api = ServeApi(host, username, password)
@@ -90,6 +99,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         sessionId = null
         lastSeenIds.clear()
         streamedParts.clear()
+        streamedMessageIds.clear()
         uiState = uiState.copy(
             connected = true,
             messages = emptyList(),
@@ -460,8 +470,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private fun refreshSlashCatalog() {
         viewModelScope.launch {
             val client = api ?: return@launch
-            val commands = runCatching { client.getList<OpenCodeCommand>("command") }.getOrNull()
-            val skills = runCatching { client.getList<OpenCodeSkill>("skill") }.getOrNull()
+            val commands = runCatching { client.getList<OpenCodeCommand>("command") }
+                .onFailure { err ->
+                    LocalBackend.appendLog("slash catalog (command) failed: ${err.message?.take(160)}")
+                }.getOrNull()
+            val skills = runCatching { client.getList<OpenCodeSkill>("skill") }
+                .onFailure { err ->
+                    LocalBackend.appendLog("slash catalog (skill) failed: ${err.message?.take(160)}")
+                }.getOrNull()
             commands?.let { backendCommands = it }
             skills?.let { backendSkills = it }
             uiState = uiState.copy(
@@ -600,7 +616,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 .filter { !it.time.isArchived }
                 .sortedByDescending { it.time.updated ?: it.time.created }
                 .take(100)
-                .map { RecentSession(it.id, it.title.ifEmpty { it.id.take(8) }) }
+                .map {
+                    val ts = it.time.updated ?: it.time.created.takeIf { t -> t > 0L }
+                    RecentSession(it.id, it.title.ifEmpty { it.id.take(8) }, ts)
+                }
             uiState = uiState.copy(
                 recents = visible,
                 // Keep a hint when the server returned sessions but all are
@@ -627,6 +646,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         pollJob?.cancel()
         sessionId = id
         streamedParts.clear()
+        streamedMessageIds.clear()
         val knownTitle = uiState.recents.firstOrNull { it.id == id }?.title
         uiState = uiState.copy(
             sending = true,
@@ -830,7 +850,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (!stillActive() || !uiState.sending) return@withTimeoutOrNull
                 // Keep the token ring truthful mid-turn, not just at the end.
                 refreshCost(id)
-                val retain = streamedParts.keys.toSet()
+                // Retain by MESSAGE id — streamedParts is keyed by part id
+                // and never matches mergeReloadedMessages. Ephemeral
+                // question/permission rows are kept too: the transcript has
+                // no copy of them, so every merge would otherwise wipe the
+                // question a second after it arrived.
+                val retain = streamedMessageIds.toSet() + ephemeralIds()
                 runCatching { client.messages(id) }.onSuccess { serverMessages ->
                     if (!stillActive()) return@onSuccess
                     val mapped = serverMessages.mapNotNull { it.toUiMessage() }
@@ -858,15 +883,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (stillActive() && (uiState.sending || finished == null)) {
             runCatching { client.messages(id) }.onSuccess { serverMessages ->
                 if (!stillActive()) return@onSuccess
-                val retained = streamedParts.keys.toSet()
+                val retained = streamedMessageIds.toSet() + ephemeralIds()
                 streamedParts.clear()
+                streamedMessageIds.clear()
                 val mapped = serverMessages.mapNotNull { it.toUiMessage() }
                 val hasResponse = serverMessages.any {
                     it.info.role == "assistant" && it.info.id !in idsBeforeSend
                 }
                 if (hasResponse || finished == null) {
                     uiState = uiState.copy(
-                        messages = mergeReloadedMessages(mapped, uiState.messages, retained),
+                        // Transcript is truth at turn end: drop the live
+                        // isStreaming flag so busy/tail stand down together.
+                        messages = mergeReloadedMessages(mapped, uiState.messages, retained)
+                            .map { it.copy(isStreaming = false) },
                         sending = false,
                         thinking = false,
                         awaitingReply = false
@@ -885,6 +914,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // The abort's own idle/error belongs to the dead run: generation-bump
         // so deferred idles can never leak into the next turn.
         runGen++
+        streamedParts.clear()
+        streamedMessageIds.clear()
+        // Drop the live flag now so busy/tail stand down with sending.
+        uiState = uiState.copy(
+            sending = false,
+            thinking = false,
+            awaitingReply = false,
+            messages = uiState.messages.map { it.copy(isStreaming = false) }
+        )
         viewModelScope.launch {
             runCatching {
                 api?.postUnit(
@@ -901,6 +939,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         pollJob?.cancel()
         sessionId = null
         streamedParts.clear()
+        streamedMessageIds.clear()
         uiState = uiState.copy(
             sending = false,
             thinking = false,
@@ -1021,8 +1060,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val client = api ?: return
         val stream = ServeEventStream(streamHost, streamUser, streamPass, client)
         eventJob = viewModelScope.launch {
-            stream.events().collect { event ->
-                handleEvent(event)
+            // An event-stream failure (e.g. HTTP 401 after a backend
+            // reinstall rotates the password) used to escape viewModelScope
+            // and kill the whole app. Now it backs off and retries — a fresh
+            // attach() restarts this loop with current credentials anyway.
+            var attempt = 0
+            var authedOnce = false
+            while (isActive) {
+                val outcome = runCatching {
+                    stream.events().collect { event ->
+                        if (!authedOnce) authedOnce = true
+                        attempt = 0
+                        handleEvent(event)
+                    }
+                }
+                val err = outcome.exceptionOrNull() ?: break
+                if (err is kotlinx.coroutines.CancellationException) throw err
+                if (err is ServeApi.HttpException && err.status == 401 && !authedOnce) {
+                    LocalBackend.appendLog("event stream unauthorized (401) — check Settings → Connection → Test & save; retrying quietly")
+                }
+                attempt++
+                delay((2_000L * attempt).coerceAtMost(30_000L))
             }
         }
     }
@@ -1110,8 +1168,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             is ServerEvent.QuestionAsked -> {
                 if (event.ask.sessionId != id) return
                 // Displayed with answer buttons (QuestionCard); replies go to
-                // POST question/{id}/reply.
+                // POST question/{id}/reply. The agent is paused on us, so the
+                // thinking tail stands down with the waiting flags.
                 uiState = uiState.copy(
+                    thinking = false,
                     awaitingReply = false,
                     messages = uiState.messages + ChatMessage(
                         id = "q-${event.ask.id}",
@@ -1159,8 +1219,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     )
                 }
-                uiState = uiState.copy(sending = false, thinking = false)
+                uiState = uiState.copy(
+                    sending = false,
+                    thinking = false,
+                    messages = uiState.messages.map { it.copy(isStreaming = false) }
+                )
                 streamedParts.clear()
+                streamedMessageIds.clear()
                 refreshMessages()
                 refreshTodos()
                 drainQueue()
@@ -1175,7 +1240,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     if (uiState.awaitingReply &&
                         uiState.messages.lastOrNull()?.isUser == true
                     ) return
-                    uiState = uiState.copy(sending = false, thinking = false)
+                    uiState = uiState.copy(
+                        sending = false,
+                        thinking = false,
+                        messages = uiState.messages.map { it.copy(isStreaming = false) }
+                    )
+                    streamedParts.clear()
+                    streamedMessageIds.clear()
                     refreshMessages()
                     refreshTodos()
                     drainQueue()
@@ -1194,6 +1265,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private fun upsertStreamedPart(messageId: String, part: ChatPart) {
         // Kill the tail "Thinking…" the moment real content streams in —
         // waiting for poll/idle caused the visible lag after answers arrived.
+        streamedMessageIds.add(messageId)
         val hasContent = when (part) {
             is ChatPart.Text -> part.text.isNotBlank()
             is ChatPart.Reasoning -> part.text.isNotBlank()
@@ -1232,6 +1304,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Ephemeral rows (question chips, permission cards) live only as
+    // client-side events — the server transcript never contains them, so
+    // every transcript merge must retain them explicitly or they vanish
+    // ~1.5s after appearing.
+    private fun ephemeralIds(): Set<String> = uiState.messages
+        .filter { message ->
+            message.permission != null ||
+                message.parts.any { it is ChatPart.QuestionOption }
+        }
+        .map { it.id }
+        .toSet()
+
     private fun refreshMessages() {
         val id = sessionId ?: return
         viewModelScope.launch {
@@ -1248,7 +1332,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             uiState = uiState.copy(
-                messages = mergeReloadedMessages(mapped, uiState.messages, streamedParts.keys.toSet()),
+                // Mid-turn keep live bubbles; at turn end the transcript
+                // (isStreaming=false) is truth so busy/tail stand down.
+                // Ephemeral question/permission rows survive either way.
+                messages = mergeReloadedMessages(
+                    mapped,
+                    uiState.messages,
+                    if (uiState.sending) streamedMessageIds.toSet() + ephemeralIds()
+                    else ephemeralIds()
+                ),
                 thinking = if (answered) false else uiState.thinking,
                 awaitingReply = if (answered) false else uiState.awaitingReply,
                 stats = uiState.stats.copy(
@@ -1272,22 +1364,43 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         atJob?.cancel()
         val query = AtMentions.detectQuery(text)
         if (query == null) {
-            if (uiState.atSuggestions.isNotEmpty()) uiState = uiState.copy(atSuggestions = emptyList())
+            if (uiState.atSuggestions.isNotEmpty() || uiState.atNoResult) {
+                uiState = uiState.copy(atSuggestions = emptyList(), atNoResult = false)
+            }
             return
         }
         atJob = viewModelScope.launch {
             delay(300L)
             val client = api ?: return@launch
+            // A failed search used to vanish silently (no popup, no reason).
+            // Log it to the server log so a wrong endpoint/shape is visible.
+            // Blank queries send the key explicitly empty: the shared builder
+            // drops blank values and the server 400s on the missing key.
             val paths = runCatching {
-                client.getList<String>("find/file", mapOf("query" to query, "limit" to "20"))
-            }.getOrNull() ?: return@launch
-            uiState = uiState.copy(atSuggestions = AtMentions.rank(paths, query))
+                if (query.isBlank()) {
+                    client.getList<String>("find/file?query=&limit=20")
+                } else {
+                    client.getList<String>("find/file", mapOf("query" to query, "limit" to "20"))
+                }
+            }.onFailure { err ->
+                val msg = "@ file search failed: ${err.message?.take(160)}"
+                if (msg != lastAtError) {
+                    lastAtError = msg
+                    LocalBackend.appendLog(msg)
+                }
+            }.getOrNull()
+            if (paths == null) {
+                uiState = uiState.copy(atSuggestions = emptyList(), atNoResult = true)
+                return@launch
+            }
+            val ranked = AtMentions.rank(paths, query)
+            uiState = uiState.copy(atSuggestions = ranked, atNoResult = ranked.isEmpty())
         }
     }
 
     fun insertAtFile(path: String) {
         val inserted = AtMentions.insert(uiState.input, path)
-        uiState = uiState.copy(input = inserted, atSuggestions = emptyList())
+        uiState = uiState.copy(input = inserted, atSuggestions = emptyList(), atNoResult = false)
     }
 
     fun appendVoiceResult(transcript: String) {
